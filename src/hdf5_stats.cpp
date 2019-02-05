@@ -22,10 +22,16 @@
  * You should have received a copy of the GNU General Public License along with
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#define KERNEL_VERSION_UNDER_4
+#ifdef KERNEL_VERSION_UNDER_4
+  #include <hdf5.h>
+  #include <hdf5_hl.h>
+#else
+  #include <hdf5/serial/hdf5.h>
+  #include <hdf5/serial/hdf5_hl.h>
+#endif
 
 #include <fstream>
-#include <hdf5/serial/hdf5.h>
-#include <hdf5/serial/hdf5_hl.h>
 #include <iostream>
 #include <vector>
 #include "galloc.h"

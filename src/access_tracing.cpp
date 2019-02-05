@@ -22,12 +22,19 @@
  * You should have received a copy of the GNU General Public License along with
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
+#define KERNEL_VERSION_UNDER_4
+
+#ifdef KERNEL_VERSION_UNDER_4
+  #include <hdf5.h>
+  #include <hdf5_hl.h>
+#else
+  #include <hdf5/serial/hdf5.h>
+  #include <hdf5/serial/hdf5_hl.h>
+#endif
+
 
 #include "access_tracing.h"
 #include "bithacks.h"
-#include <hdf5/serial/hdf5.h>
-#include <hdf5/serial/hdf5_hl.h>
-
 #define PT_CHUNKSIZE (1024*256u)  // 256K records (~6MB)
 
 AccessTraceReader::AccessTraceReader(std::string _fname) : fname(_fname.c_str()) {
