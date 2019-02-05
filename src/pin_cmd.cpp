@@ -50,6 +50,9 @@ PinCmd::PinCmd(Config* conf, const char* configFile, const char* outputDir, uint
     }
 
     args.push_back(pinPath);
+    args.push_back("-injection");
+    args.push_back("child");
+    args.push_back("-ifeellucky");
 
     //Global pin options
     args.push_back("-follow_execv"); //instrument child processes
