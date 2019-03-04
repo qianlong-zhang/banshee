@@ -39,6 +39,8 @@ const char* Cache::getName() {
 
 void Cache::setParents(uint32_t childId, const g_vector<MemObject*>& parents, Network* network) {
 	//printf("name = %s, parents.size()=%ld\n", name.c_str(), parents.size());
+    //for (unsigned int i=0; i< parents.size(); i++)
+    //{ info("parent: %s", parents[i]->getName() ) ;}
     cc->setParents(childId, parents, network);
 }
 
@@ -71,7 +73,7 @@ uint64_t Cache::access(MemReq& req) {
             //Make space for new line
             Address wbLineAddr;
             lineId = array->preinsert(req.lineAddr, &req, &wbLineAddr); //find the lineId to replace
-            trace(Cache, "[%s] Evicting 0x%lx", name.c_str(), wbLineAddr);
+            trace(Cache, "MemReq address: 0x%lx, [%s] Evicting 0x%lx", req.lineAddr, name.c_str(), wbLineAddr);
 
             //Evictions are not in the critical path in any sane implementation -- we do not include their delays
             //NOTE: We might be "evicting" an invalid line for all we know. Coherence controllers will know what to do

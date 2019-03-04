@@ -46,8 +46,10 @@ uint32_t MESIBottomCC::getParentId(Address lineAddr) {
 void MESIBottomCC::init(const g_vector<MemObject*>& _parents, Network* network, const char* name) {
     parents.resize(_parents.size());
     parentRTTs.resize(_parents.size());
+	//info("In func %s, parents.size = %ld, parents[0]=%s", __func__, parents.size(), parents[0]->getName());
     for (uint32_t p = 0; p < parents.size(); p++) {
         parents[p] = _parents[p];
+		//info("parents[%d] = %s",p, parents[0]->getName());
         parentRTTs[p] = (network)? network->getRTT(name, parents[p]->getName()) : 0;
     }
 }

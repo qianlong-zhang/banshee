@@ -54,6 +54,8 @@ class TimingCache : public Cache {
         PAD();
         lock_t topLock;
         PAD();
+		g_unordered_map <Address, TLBEntry> * _tlb_mc;
+		g_unordered_map <Address, TLBEntry> * _tlb_ext;
 
     public:
         TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs,
@@ -67,6 +69,8 @@ class TimingCache : public Cache {
         void simulateMissResponse(MissResponseEvent* ev, uint64_t cycle, MissStartEvent* mse);
         void simulateMissWriteback(MissWritebackEvent* ev, uint64_t cycle, MissStartEvent* mse);
         void simulateReplAccess(ReplAccessEvent* ev, uint64_t cycle);
+	   	g_unordered_map<Address, TLBEntry> * getTLB_MC() { return _tlb_mc; };
+	   	g_unordered_map<Address, TLBEntry> * getTLB_EXT() { return _tlb_ext; };
 
     private:
         uint64_t highPrioAccess(uint64_t cycle);
