@@ -54,12 +54,15 @@ class TimingCache : public Cache {
         PAD();
         lock_t topLock;
         PAD();
-		g_unordered_map <Address, TLBEntry> * _tlb_mc;
-		g_unordered_map <Address, TLBEntry> * _tlb_ext;
+
+        //for tlb in llc
+		bool is_llc;
+		g_unordered_map <Address, TLBEntry> * _tlb_mem0;
+		g_unordered_map <Address, TLBEntry> * _tlb_mem1;
+        uint32_t dram_cache_granularity;
 
     public:
-        TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs,
-                uint32_t tagLat, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name);
+        TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t tagLat, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name);
         void initStats(AggregateStat* parentStat);
 
         uint64_t access(MemReq& req);
@@ -69,8 +72,16 @@ class TimingCache : public Cache {
         void simulateMissResponse(MissResponseEvent* ev, uint64_t cycle, MissStartEvent* mse);
         void simulateMissWriteback(MissWritebackEvent* ev, uint64_t cycle, MissStartEvent* mse);
         void simulateReplAccess(ReplAccessEvent* ev, uint64_t cycle);
-	   	g_unordered_map<Address, TLBEntry> * getTLB_MC() { return _tlb_mc; };
-	   	g_unordered_map<Address, TLBEntry> * getTLB_EXT() { return _tlb_ext; };
+
+	   	void setTLB_mem0(g_unordered_map<Address, TLBEntry> *tlb) { _tlb_mem0 = tlb; };
+	   	void setTLB_mem1(g_unordered_map<Address, TLBEntry> *tlb ) { _tlb_mem1 = tlb; };
+
+	   	g_unordered_map<Address, TLBEntry> * getTLB_mem0() { return _tlb_mem0; };
+	   	g_unordered_map<Address, TLBEntry> * getTLB_mem1() { return _tlb_mem1; };
+        uint32_t get_dram_cache_granu() { return dram_cache_granularity ; };
+        void  set_dram_cache_granu(uint32_t granu) { dram_cache_granularity =granu; };
+        bool if_is_llc() { return is_llc;} ;
+        void set_llc(bool llc) {  is_llc = llc;} ;
 
     private:
         uint64_t highPrioAccess(uint64_t cycle);

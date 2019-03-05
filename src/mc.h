@@ -51,7 +51,7 @@ public:
    bool hasEmptyWay() { return getEmptyWay() < num_ways; };
 };
 
-// Not modeling all details of the tag buffer. 
+// Not modeling all details of the tag buffer.
 class TagBufferEntry
 {
 public:
@@ -92,7 +92,7 @@ public:
    uint64_t count; // for OS based placement policy
 
    // the following two are only for UnisonCache
-   // due to space cosntraint, it is not feasible to keep one bit for each line, 
+   // due to space cosntraint, it is not feasible to keep one bit for each line,
    // so we use 1 bit for 4 lines.
    uint64_t touch_bitvec; // whether a line is touched in a page
    uint64_t dirty_bitvec; // whether a line is dirty in page
@@ -108,7 +108,7 @@ class DDRMemory;
 class MemoryController : public MemObject {
 private:
 	DDRMemory * BuildDDRMemory(Config& config, uint32_t frequency, uint32_t domain, g_string name, const std::string& prefix, uint32_t tBL, double timing_scale);
-	
+
 	g_string _name;
 
 	// Trace related code
@@ -122,13 +122,13 @@ private:
 
 	// External Dram Configuration
 	MemObject *	_ext_dram;
-	g_string _ext_type; 
-public:	
+	g_string _ext_type;
+public:
 	// MC-Dram Configuration
 	MemObject ** _mcdram;
 	uint32_t _mcdram_per_mc;
 	g_string _mcdram_type;
-	
+
 	uint64_t getNumRequests() { return _num_requests; };
    	uint64_t getNumSets()     { return _num_sets; };
    	uint32_t getNumWays()     { return _num_ways; };
@@ -144,11 +144,11 @@ private:
 	// For Alloy Cache.
 	Address transMCAddress(Address mc_addr);
 	// For Page Granularity Cache
-	Address transMCAddressPage(uint64_t set_num, uint32_t way_num); 
+	Address transMCAddressPage(uint64_t set_num, uint32_t way_num);
 
 	// For Tagless.
-	// For Tagless, we don't use "Set * _cache;" as other schemes. Instead, we use the following 
-	// structure to model a fully associative cache with FIFO replacement 
+	// For Tagless, we don't use "Set * _cache;" as other schemes. Instead, we use the following
+	// structure to model a fully associative cache with FIFO replacement
 	//vector<Address> _idx_to_address;
 	uint64_t _next_evict_idx;
 	//map<uint64_t, uint64_t> _address_to_idx;
@@ -163,15 +163,15 @@ private:
 	PagePlacementPolicy * _page_placement_policy;
 	OSPlacementPolicy * _os_placement_policy;
 	uint64_t _num_requests;
-	Scheme _scheme; 
+	Scheme _scheme;
 	TagBuffer * _tag_buffer;
-	
-	// For HybridCache
-	uint32_t _footprint_size; 
 
-	// Balance in- and off-package DRAM bandwidth. 
+	// For HybridCache
+	uint32_t _footprint_size;
+
+	// Balance in- and off-package DRAM bandwidth.
 	// From "BATMAN: Maximizing Bandwidth Utilization of Hybrid Memory Systems"
-	bool _bw_balance; 
+	bool _bw_balance;
 	uint64_t _ds_index;
 
 	// TLB Hack
@@ -186,11 +186,11 @@ private:
 	Counter _numLoadMiss;
 	Counter _numStoreHit;
 	Counter _numStoreMiss;
-	Counter _numCounterAccess; // for FBR placement policy  
+	Counter _numCounterAccess; // for FBR placement policy
 
 	Counter _numTagLoad;
 	Counter _numTagStore;
-	// For HybridCache	
+	// For HybridCache
 	Counter _numTagBufferFlush;
 	Counter _numTBDirtyHit;
 	Counter _numTBDirtyMiss;
@@ -213,7 +213,7 @@ public:
 	MemoryController(g_string& name, uint32_t frequency, uint32_t domain, Config& config);
 	uint64_t access(MemReq& req);
 	const char * getName() { return _name.c_str(); };
-	void initStats(AggregateStat* parentStat); 
+	void initStats(AggregateStat* parentStat);
 	// Use glob mem
 	//using GlobAlloc::operator new;
 	//using GlobAlloc::operator delete;

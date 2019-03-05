@@ -28,6 +28,7 @@
 
 #include "event_recorder.h"
 #include "timing_event.h"
+#include "timing_cache.h"
 #include "zsim.h"
 
 Cache::Cache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, const g_string& _name)

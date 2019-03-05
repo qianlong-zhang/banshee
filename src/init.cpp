@@ -83,14 +83,21 @@ extern void EndOfPhaseActions(); //in zsim.cpp
  * follow the layout of zinfo, top-down.
  */
 
-BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, uint32_t bankSize, bool isTerminal, uint32_t domain) {
+BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, uint32_t bankSize, bool isTerminal, uint32_t domain, bool is_llc) {
     string type = config.get<const char*>(prefix + "type", "Simple");
+	//info("Building cache %s", type.c_str());
     // Shortcut for TraceDriven type
     if (type == "TraceDriven") {
         assert(zinfo->traceDriven);
         assert(isTerminal);
         return new TraceDriverProxyCache(name);
     }
+
+	//make sure only Timing cache can have tlb in LLC
+	bool enable_tlb_llc = config.get<bool>(prefix + "enable_tlb_llc", false);
+	string temp_type = "Timing";
+	if (enable_tlb_llc)
+		assert(temp_type == type);
 
     uint32_t lineSize = zinfo->lineSize;
     assert(lineSize > 0); //avoid config deps
@@ -276,7 +283,11 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
             uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
+			uint32_t dram_cache_granularity = config.get<uint32_t>("sys.mem.mcdram.cache_granularity");
+			//info(" dram_cache_granularity is %d", dram_cache_granularity);
             cache = new TimingCache(numLines, cc, array, rp, accLat, invLat, mshrs, tagLat, ways, timingCandidates, domain, name);
+			dynamic_cast<TimingCache*>(cache)->set_llc(is_llc);
+			dynamic_cast<TimingCache*>(cache)->set_dram_cache_granu(dram_cache_granularity);
         } else if (type == "Tracing") {
             g_string traceFile = config.get<const char*>(prefix + "traceFile","");
             if (traceFile.empty()) traceFile = g_string(zinfo->outputDir) + "/" + name + ".trace";
@@ -335,7 +346,8 @@ MemObject* BuildMemoryController(Config& config, uint32_t lineSize, uint32_t fre
     if (type == "Simple") {
         mem = new SimpleMemory(latency, name, config);
     } else if (type == "DramCache") {
-		mem = new MemoryController(name, frequency, domain, config);	
+		//info("Creating DramCache memory controller!");
+		mem = new MemoryController(name, frequency, domain, config);
 	} else if (type == "MD1") {
         // The following params are for MD1 only
         // NOTE: Frequency (in MHz) -- note this is a sys parameter (not sys.mem). There is an implicit assumption of having
@@ -377,6 +389,13 @@ typedef vector<vector<BaseCache*>> CacheGroup;
 CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal) {
     CacheGroup* cgp = new CacheGroup;
     CacheGroup& cg = *cgp;
+	bool is_llc = false;
+	info("Creating %s", name.c_str());
+	if(name.compare("l3") == 0 )
+	{
+		info("Creating LLC!!");
+		 is_llc = true;
+	}
 
     string prefix = "sys.caches." + name + ".";
 
@@ -417,7 +436,8 @@ CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal)
             }
             g_string bankName(ss.str().c_str());
             uint32_t domain = (i*banks + j)*zinfo->numDomains/(caches*banks); //(banks > 1)? nextDomain() : (i*banks + j)*zinfo->numDomains/(caches*banks);
-            cg[i][j] = BuildCacheBank(config, prefix, bankName, bankSize, isTerminal, domain);
+            cg[i][j] = BuildCacheBank(config, prefix, bankName, bankSize, isTerminal, domain, is_llc);
+			//info("Building cache %s", cg[i][j]->getName());
         }
     }
 
@@ -442,6 +462,27 @@ static void InitSystem(Config& config) {
     string networkFile = config.get<const char*>("sys.networkFile", "");
     Network* network = (networkFile != "")? new Network(networkFile.c_str()) : nullptr;
 
+    /* Since we have checked for no loops, parent is mandatory, and all parents are checked valid,
+     * it follows that we have a fully connected tree finishing at the LLC.
+     */
+
+    //Build the memory controllers
+    uint32_t memControllers = config.get<uint32_t>("sys.mem.controllers", 1);
+    assert(memControllers > 0);
+
+    g_vector<MemObject*> mems;
+    mems.resize(memControllers);
+
+    for (uint32_t i = 0; i < memControllers; i++) {
+        stringstream ss;
+        ss << "mem-" << i;
+        g_string name(ss.str().c_str());
+        //uint32_t domain = nextDomain(); //i*zinfo->numDomains/memControllers;
+        uint32_t domain = i*zinfo->numDomains/memControllers;
+        mems[i] = BuildMemoryController(config, zinfo->lineSize, zinfo->freqMHz, domain, name);
+		//info("mems[%d] tlb is :%p", i, dynamic_cast<MemoryController*>(mems[i])->getTLB()); //every mc has unique tlb
+    }
+
     // Build the caches
     vector<const char*> cacheGroupNames;
     config.subgroups("sys.caches", cacheGroupNames);
@@ -449,16 +490,19 @@ static void InitSystem(Config& config) {
 
     for (const char* grp : cacheGroupNames) {
         string group(grp);
+		//info("grp : %s", grp);
         if (group == "mem") panic("'mem' is an invalid cache group name");
         if (childMap.count(group)) panic("Duplicate cache group %s", (prefix + group).c_str());
 
         string children = config.get<const char*>(prefix + group + ".children", "");
+		//info("children: %s\n", children.c_str());
         childMap[group] = parseChildren(children);
         for (auto v : childMap[group]) for (auto child : v) {
             if (parentMap.count(child)) {
                 panic("Cache group %s can have only one parent (%s and %s found)", child.c_str(), parentMap[child].c_str(), grp);
             }
             parentMap[child] = group;
+			//info("parentMap[child].c_str() : %s", parentMap[child].c_str());
         }
     }
 
@@ -494,25 +538,27 @@ static void InitSystem(Config& config) {
     //Check single LLC
     if (cMap[llc]->size() != 1) panic("Last-level cache %s must have caches = 1, but %ld were specified", llc.c_str(), cMap[llc]->size());
 
-    /* Since we have checked for no loops, parent is mandatory, and all parents are checked valid,
-     * it follows that we have a fully connected tree finishing at the LLC.
-     */
+    //Connect everything
+    bool printHierarchy = config.get<bool>("sim.printHierarchy", false);
 
-    //Build the memory controllers
-    uint32_t memControllers = config.get<uint32_t>("sys.mem.controllers", 1);
-    assert(memControllers > 0);
+    // mem to llc is a bit special, only one llc
+    uint32_t childId = 0;
+    for (BaseCache* llcBank : (*cMap[llc])[0]) {
+		//info("Seting LLC parenats\n");
+        llcBank->setParents(childId++, mems, network);
 
-    g_vector<MemObject*> mems;
-    mems.resize(memControllers);
-
-    for (uint32_t i = 0; i < memControllers; i++) {
-        stringstream ss;
-        ss << "mem-" << i;
-        g_string name(ss.str().c_str());
-        //uint32_t domain = nextDomain(); //i*zinfo->numDomains/memControllers;
-        uint32_t domain = i*zinfo->numDomains/memControllers;
-        mems[i] = BuildMemoryController(config, zinfo->lineSize, zinfo->freqMHz, domain, name);
-    }
+		//set TLB in llc to point to the TLB in all MC
+		if( memControllers == 2) {
+			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem0(dynamic_cast<MemoryController*>(mems[0])->getTLB());
+			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem1(dynamic_cast<MemoryController*>(mems[1])->getTLB());
+		}
+		else
+		{
+			assert(memControllers == 1);
+			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem0(NULL);
+			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem1(dynamic_cast<MemoryController*>(mems[0])->getTLB());
+		}
+	}
 
     if (memControllers > 1) {
         bool splitAddrs = config.get<bool>("sys.mem.splitAddrs", true);
@@ -523,14 +569,6 @@ static void InitSystem(Config& config) {
         }
     }
 
-    //Connect everything
-    bool printHierarchy = config.get<bool>("sim.printHierarchy", false);
-
-    // mem to llc is a bit special, only one llc
-    uint32_t childId = 0;
-    for (BaseCache* llcBank : (*cMap[llc])[0]) {
-        llcBank->setParents(childId++, mems, network);
-    }
 
     // Rest of caches
     for (const char* grp : cacheGroupNames) {
@@ -571,7 +609,7 @@ static void InitSystem(Config& config) {
                   "Use multiple groups for non-homogeneous children per parent!", grp, parents, children);
         }
 
-		printf("children = %d, parents=%d\n", children, parents);
+		//info("children = %d, parents=%d\n", children, parents);
         for (uint32_t p = 0; p < parents; p++) {
             g_vector<MemObject*> parentsVec;
             parentsVec.insert(parentsVec.end(), parentCaches[p].begin(), parentCaches[p].end()); //BaseCache* to MemObject* is a safe cast

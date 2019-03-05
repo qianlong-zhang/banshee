@@ -78,8 +78,7 @@ class ReplAccessEvent : public TimingEvent {
         void simulate(uint64_t startCycle) {cache->simulateReplAccess(this, startCycle);}
 };
 
-TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp,
-        uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t _tagLat, uint32_t _ways, uint32_t _cands, uint32_t _domain, const g_string& _name)
+TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t _tagLat, uint32_t _ways, uint32_t _cands, uint32_t _domain, const g_string& _name)
     : Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name), numMSHRs(mshrs), tagLat(_tagLat), ways(_ways), cands(_cands)
 {
     lastFreeCycle = 0;
@@ -87,7 +86,7 @@ TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPo
     assert(numMSHRs > 0);
     activeMisses = 0;
     domain = _domain;
-    info("%s: mshrs %d domain %d", name.c_str(), numMSHRs, domain);
+    info("%s: mshrs %d domain %d,  this pointer is %p", name.c_str(), numMSHRs, domain,  this);
 }
 
 void TimingCache::initStats(AggregateStat* parentStat) {
@@ -260,6 +259,27 @@ uint64_t TimingCache::access(MemReq& req) {
         }
         evRec->pushRecord(tr);
     }
+
+	//print tlb
+#if 0
+	//assert this cache is timing cache, because TLB only exist in LLC timing cache
+	std::string cache_name = this->getName();
+	if ( cache_name.find("l3") != std::string::npos )
+	{
+		//info("this pointer is %p, cache_name is %s, is llc? %s, dram cache granu is %d", this, cache_name.c_str(), this->if_is_llc()?"True":"false", this->get_dram_cache_granu());
+		assert(this->get_dram_cache_granu() != 0);
+		assert(this->if_is_llc());
+		Address	temp_tag = req.lineAddr / (this->get_dram_cache_granu() / 64);
+		//info("In llc, access address is 0x%lx, tag is 0x%lx", req.lineAddr, temp_tag);
+
+#if 1
+		g_unordered_map<Address, TLBEntry> temp_tlb = *(dynamic_cast<TimingCache*>(this)->getTLB_mem0());
+		if(temp_tlb.find(temp_tag) != temp_tlb.end())
+			info("In cache, addr is 0x%lx, tag is 0x%lx,  printing TLB tag = 0x%lx",req.lineAddr, temp_tag, temp_tlb[temp_tag].tag );
+#endif
+	}
+#endif
+
 
     cc->endAccess(req);
 

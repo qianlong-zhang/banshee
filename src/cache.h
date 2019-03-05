@@ -33,6 +33,7 @@
 #include "memory_hierarchy.h"
 #include "repl_policies.h"
 #include "stats.h"
+#include "mc.h"
 
 class Network;
 

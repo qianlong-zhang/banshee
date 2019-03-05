@@ -28,8 +28,8 @@ MemoryController::MemoryController(g_string& name, uint32_t frequency, uint32_t 
 	g_string scheme = config.get<const char *>("sys.mem.cache_scheme", "NoCache");
 	_ext_type = config.get<const char *>("sys.mem.ext_dram.type", "Simple");
 	if (scheme != "NoCache") {
-		_granularity = config.get<uint32_t>("sys.mem.mcdram.cache_granularity");	
-		_num_ways = config.get<uint32_t>("sys.mem.mcdram.num_ways");	
+		_granularity = config.get<uint32_t>("sys.mem.mcdram.cache_granularity");
+		_num_ways = config.get<uint32_t>("sys.mem.mcdram.num_ways");
 		_mcdram_type = config.get<const char *>("sys.mem.mcdram.type", "Simple");
 		_cache_size = config.get<uint32_t>("sys.mem.mcdram.size", 128) * 1024 * 1024;
 	}
@@ -48,7 +48,7 @@ MemoryController::MemoryController(g_string& name, uint32_t frequency, uint32_t 
 		_scheme = HMA;
 	} else if (scheme == "HybridCache") {
 		// 4KB page or 2MB page
-		assert(_granularity == 4096 || _granularity == 4096 * 512); 
+		assert(_granularity == 4096 || _granularity == 4096 * 512);
 		_scheme = HybridCache;
 	} else if (scheme == "NoCache")
 		_scheme = NoCache;
@@ -59,7 +59,7 @@ MemoryController::MemoryController(g_string& name, uint32_t frequency, uint32_t 
 		_next_evict_idx = 0;
 		_footprint_size = config.get<uint32_t>("sys.mem.mcdram.footprint_size");
 	}
-	else { 
+	else {
 		printf("scheme=%s\n", scheme.c_str());
 		assert(false);
 	}
@@ -94,10 +94,10 @@ MemoryController::MemoryController(g_string& name, uint32_t frequency, uint32_t 
         _ext_dram = (DRAMSimMemory *) gm_malloc(sizeof(DRAMSimMemory));
     	uint32_t latency = config.get<uint32_t>("sys.mem.ext_dram.latency", 100);
 		new (_ext_dram) DRAMSimMemory(dramTechIni, dramSystemIni, outputDir, traceName, capacity, cpuFreqHz, latency, domain, name);
-	} else 
+	} else
         panic("Invalid memory controller type %s", _ext_type.c_str());
 
-	if (_scheme != NoCache) {		
+	if (_scheme != NoCache) {
 		// Configure the MC-Dram (Timing Model)
 		_mcdram_per_mc = config.get<uint32_t>("sys.mem.mcdram.mcdramPerMC", 4);
 		//_mcdram = new MemObject * [_mcdram_per_mc];
@@ -111,7 +111,7 @@ MemoryController::MemoryController(g_string& name, uint32_t frequency, uint32_t 
 				new (_mcdram[i]) SimpleMemory(latency, mcdram_name, config);
 	        	//_mcdram[i] = new SimpleMemory(latency, mcdram_name, config);
 			} else if (_mcdram_type == "DDR") {
-				// XXX HACK tBL for mcdram is 1, so for data access, should multiply by 2, for tad access, should multiply by 3. 
+				// XXX HACK tBL for mcdram is 1, so for data access, should multiply by 2, for tad access, should multiply by 3.
         		_mcdram[i] = BuildDDRMemory(config, frequency, domain, mcdram_name, "sys.mem.mcdram.", 4, timing_scale);
 			} else if (_mcdram_type == "MD1") {
 				uint32_t latency = config.get<uint32_t>("sys.mem.mcdram.latency", 50);
@@ -130,7 +130,7 @@ MemoryController::MemoryController(g_string& name, uint32_t frequency, uint32_t 
 		        _mcdram[i] = (DRAMSimMemory *) gm_malloc(sizeof(DRAMSimMemory));
     			uint32_t latency = config.get<uint32_t>("sys.mem.mcdram.latency", 50);
 				new (_mcdram[i]) DRAMSimMemory(dramTechIni, dramSystemIni, outputDir, traceName, capacity, cpuFreqHz, latency, domain, name);
-			} else 
+			} else
     	     	panic("Invalid memory controller type %s", _mcdram_type.c_str());
 		}
 		// Configure MC-Dram Functional Model
@@ -158,7 +158,7 @@ MemoryController::MemoryController(g_string& name, uint32_t frequency, uint32_t 
 		}
 	}
 	if (_scheme == HybridCache) {
-		_tag_buffer = (TagBuffer *) gm_malloc(sizeof(TagBuffer));	
+		_tag_buffer = (TagBuffer *) gm_malloc(sizeof(TagBuffer));
 		new (_tag_buffer) TagBuffer(config);
 	}
  	// Stats
@@ -171,7 +171,7 @@ MemoryController::MemoryController(g_string& name, uint32_t frequency, uint32_t 
    _num_requests = 0;
 }
 
-uint64_t 
+uint64_t
 MemoryController::access(MemReq& req)
 {
 	switch (req.type) {
@@ -213,16 +213,16 @@ MemoryController::access(MemReq& req)
 		futex_unlock(&_lock);
 		return req.cycle;
 		////////////////////////////////////
-	} 
+	}
 	/////////////////////////////
 	// TODO For UnisonCache
 	// should correctly model way accesses
 	/////////////////////////////
-	
+
 	ReqType type = (req.type == GETS || req.type == GETX)? LOAD : STORE;
 	Address address = req.lineAddr;
 	uint32_t mcdram_select = (address / 64) % _mcdram_per_mc;
-	Address mc_address = (address / 64 / _mcdram_per_mc * 64) | (address % 64); 
+	Address mc_address = (address / 64 / _mcdram_per_mc * 64) | (address % 64);
 	//printf("address=%ld, _mcdram_per_mc=%d, mc_address=%ld\n", address, _mcdram_per_mc, mc_address);
 	Address tag = address / (_granularity / 64);
 	uint64_t set_num = tag % _num_sets;
@@ -241,11 +241,11 @@ MemoryController::access(MemReq& req)
 		return req.cycle;
 		////////////////////////////////////
 	}
-	uint64_t step_length = _cache_size / 64 / 10; 
+	uint64_t step_length = _cache_size / 64 / 10;
 
 	// whether needs to probe tag for HybridCache.
-	// need to do so for LLC dirty eviction and if the page is not in TB  
-	bool hybrid_tag_probe = false; 
+	// need to do so for LLC dirty eviction and if the page is not in TB
+	bool hybrid_tag_probe = false;
 	if (_granularity >= 4096) {
 		if (_tlb.find(tag) == _tlb.end())
          	_tlb[tag] = TLBEntry {tag, _num_ways, 0, 0, 0};
@@ -259,7 +259,7 @@ MemoryController::access(MemReq& req)
 		}
 
 		if (_scheme == UnisonCache) {
-			//// Tag and data access. For simplicity, use a single access.  
+			//// Tag and data access. For simplicity, use a single access.
 			if (type == LOAD) {
 				req.lineAddr = mc_address; //transMCAddressPage(set_num, 0); //mc_address;
 				req.cycle = _mcdram[mcdram_select]->access(req, 0, 6);
@@ -288,23 +288,23 @@ MemoryController::access(MemReq& req)
  	}
    	else {
 		assert(_scheme == AlloyCache);
-		if (_cache[set_num].ways[0].valid && _cache[set_num].ways[0].tag == tag && set_num >= _ds_index) 
+		if (_cache[set_num].ways[0].valid && _cache[set_num].ways[0].tag == tag && set_num >= _ds_index)
 			hit_way = 0;
-		if (type == LOAD && set_num >= _ds_index) { 
+		if (type == LOAD && set_num >= _ds_index) {
 			///// mcdram TAD access
 			// Modeling TAD as 2 cachelines
 			if (_sram_tag) {
-				req.cycle += _llc_latency; 
+				req.cycle += _llc_latency;
 /*				if (hit_way == 0) {
-					req.lineAddr = mc_address; 
+					req.lineAddr = mc_address;
 					req.cycle = _mcdram[mcdram_select]->access(req, 0, 4);
 					_mc_bw_per_step += 4;
 					_numTagLoad.inc();
 					req.lineAddr = address;
 				}
 */
-			} else { 
-				req.lineAddr = mc_address; 
+			} else {
+				req.lineAddr = mc_address;
 				req.cycle = _mcdram[mcdram_select]->access(req, 0, 6);
 				_mc_bw_per_step += 6;
 				_numTagLoad.inc();
@@ -314,9 +314,9 @@ MemoryController::access(MemReq& req)
 		}
    	}
 	bool cache_hit = hit_way != _num_ways;
-	
-	//orig_cycle = req.cycle; 
-	// dram cache logic. Here, I'm assuming the 4 mcdram channels are 
+
+	//orig_cycle = req.cycle;
+	// dram cache logic. Here, I'm assuming the 4 mcdram channels are
 	// organized centrally
 	bool counter_access = false;
 	// use the following state for requests, so that req.state is not changed
@@ -328,7 +328,7 @@ MemoryController::access(MemReq& req)
 			_numLoadMiss.inc();
 		else
 			_numStoreMiss.inc();
-		
+
 		uint32_t replace_way = _num_ways;
       	if (_scheme == AlloyCache) {
 			bool place = false;
@@ -351,7 +351,7 @@ MemoryController::access(MemReq& req)
 			if (type == LOAD) {
 				if (!_sram_tag && set_num >= _ds_index)
 					req.cycle = _ext_dram->access(req, 1, 4);
-				else 
+				else
 					req.cycle = _ext_dram->access(req, 0, 4);
 				_ext_bw_per_step += 4;
 				data_ready_cycle = req.cycle;
@@ -366,7 +366,7 @@ MemoryController::access(MemReq& req)
 				_ext_bw_per_step += 4;
 				data_ready_cycle = req.cycle;
 			}
-		} else if (_scheme == HMA) { 
+		} else if (_scheme == HMA) {
 			req.cycle = _ext_dram->access(req, 0, 4);
 			_ext_bw_per_step += 4;
 			data_ready_cycle = req.cycle;
@@ -374,7 +374,7 @@ MemoryController::access(MemReq& req)
 			if (type == LOAD) {
 				req.cycle = _ext_dram->access(req, 1, 4);
 				_ext_bw_per_step += 4;
-			} else if (type == STORE && replace_way >= _num_ways) { 
+			} else if (type == STORE && replace_way >= _num_ways) {
 				req.cycle = _ext_dram->access(req, 1, 4);
 				_ext_bw_per_step += 4;
 			}
@@ -400,19 +400,19 @@ MemoryController::access(MemReq& req)
 			data_ready_cycle = req.cycle;
 		}
 		////////////////////////////////////
-      	
+
 		if (replace_way < _num_ways)
       	{
-			///// mcdram replacement 
-			// TODO update the address 
-			if (_scheme == AlloyCache) { 
+			///// mcdram replacement
+			// TODO update the address
+			if (_scheme == AlloyCache) {
 	            MemReq insert_req = {mc_address, PUTX, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
 				uint32_t size = _sram_tag? 4 : 6;
 				_mcdram[mcdram_select]->access(insert_req, 2, size);
 				_mc_bw_per_step += size;
 				_numTagStore.inc();
 			} else if (_scheme == UnisonCache || _scheme == HybridCache || _scheme == Tagless) {
-				uint32_t access_size = (_scheme == UnisonCache || _scheme == Tagless)? _footprint_size : (_granularity / 64); 
+				uint32_t access_size = (_scheme == UnisonCache || _scheme == Tagless)? _footprint_size : (_granularity / 64);
 				// load page from ext dram
 		        MemReq load_req = {tag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
 				_ext_dram->access(load_req, 2, access_size*4);
@@ -440,7 +440,7 @@ MemoryController::access(MemReq& req)
 			{
 				Address replaced_tag = _cache[set_num].ways[replace_way].tag;
 				// Note that tag_buffer is not updated if placed into an invalid entry.
-				// this is like ignoring the initialization cost 
+				// this is like ignoring the initialization cost
 				if (_scheme == HybridCache) {
 					// Update TagBuffer
 					//if (!_tag_buffer->canInsert(tag, replaced_tag)) {
@@ -475,7 +475,7 @@ MemoryController::access(MemReq& req)
 					_numDirtyEviction.inc();
 					///////   store dirty line back to external dram
 					// Store starts after TAD is loaded.
-					// request not on critical path. 
+					// request not on critical path.
 					if (_scheme == AlloyCache) {
 						if (type == STORE) {
 							if (_sram_tag) {
@@ -494,7 +494,7 @@ MemoryController::access(MemReq& req)
 						_mcdram[mcdram_select]->access(load_req, 2, (_granularity / 64)*4);
 						_mc_bw_per_step += (_granularity / 64)*4;
 						// store page to ext dram
-						// TODO. this event should be appended under the one above. 
+						// TODO. this event should be appended under the one above.
 						// but they are parallel right now.
 	        	    	MemReq wb_req = {_cache[set_num].ways[replace_way].tag * 64, PUTX, req.childId, &state, cur_cycle, req.childLock, req.initialState, req.srcId, req.flags};
 						_ext_dram->access(wb_req, 2, (_granularity / 64) * 4);
@@ -507,7 +507,7 @@ MemoryController::access(MemReq& req)
 						_mcdram[mcdram_select]->access(load_req, 2, unison_dirty_lines*4);
 						_mc_bw_per_step += unison_dirty_lines*4;
 						// store page to ext dram
-						// TODO. this event should be appended under the one above. 
+						// TODO. this event should be appended under the one above.
 						// but they are parallel right now.
 	        	    	MemReq wb_req = {_cache[set_num].ways[replace_way].tag * 64, PUTX, req.childId, &state, cur_cycle, req.childLock, req.initialState, req.srcId, req.flags};
 						_ext_dram->access(wb_req, 2, unison_dirty_lines*4);
@@ -518,13 +518,13 @@ MemoryController::access(MemReq& req)
 							_ext_dram->access(load_gipt_req, 2, 2); // update GIPT
 							_ext_dram->access(store_gipt_req, 2, 2); // update GIPT
 							_ext_bw_per_step += 4;
-						} 
+						}
 					}
 
 					/////////////////////////////
             	} else {
 					_numCleanEviction.inc();
-					 if (_scheme == UnisonCache || _scheme == Tagless) 
+					 if (_scheme == UnisonCache || _scheme == Tagless)
 						assert(unison_dirty_lines == 0);
 				}
          	}
@@ -543,9 +543,9 @@ MemoryController::access(MemReq& req)
 					_tlb[tag].dirty_bitvec |= bit;
 			}
       	} else {
-			// Miss but no replacement 
-			if (_scheme == HybridCache) 
-				if (type == LOAD && _tag_buffer->canInsert(tag)) 
+			// Miss but no replacement
+			if (_scheme == HybridCache)
+				if (type == LOAD && _tag_buffer->canInsert(tag))
 					_tag_buffer->insert(tag, false);
 			assert(_scheme != Tagless)
 		}
@@ -556,7 +556,7 @@ MemoryController::access(MemReq& req)
 		        MemReq read_req = {mc_address, GETX, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
 				req.cycle = _mcdram[mcdram_select]->access(read_req, 0, 4);
 				_mc_bw_per_step += 4;
-			} 
+			}
 			if (type == STORE) {
 				// LLC dirty eviction hit
 		        MemReq write_req = {mc_address, PUTX, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
@@ -585,15 +585,15 @@ MemoryController::access(MemReq& req)
 		}
 		else
 			_numLoadHit.inc();
-	
+
 		if (_scheme == HybridCache) {
 			if (!hybrid_tag_probe) {
-				req.lineAddr = mc_address; 
+				req.lineAddr = mc_address;
 				req.cycle = _mcdram[mcdram_select]->access(req, 0, 4);
 				_mc_bw_per_step += 4;
 				req.lineAddr = address;
 				data_ready_cycle = req.cycle;
-				if (type == LOAD && _tag_buffer->canInsert(tag)) 
+				if (type == LOAD && _tag_buffer->canInsert(tag))
 					_tag_buffer->insert(tag, false);
 			} else {
 				assert(!_sram_tag);
@@ -601,7 +601,7 @@ MemoryController::access(MemReq& req)
 				req.cycle = _mcdram[mcdram_select]->access(tag_probe, 0, 2);
 				_mc_bw_per_step += 2;
 				_numTagLoad.inc();
-				req.lineAddr = mc_address; 
+				req.lineAddr = mc_address;
 				req.cycle = _mcdram[mcdram_select]->access(req, 1, 4);
 				_mc_bw_per_step += 4;
 				req.lineAddr = address;
@@ -609,12 +609,12 @@ MemoryController::access(MemReq& req)
 			}
 		}
 		else if (_scheme == Tagless) {
-			req.lineAddr = mc_address; 
+			req.lineAddr = mc_address;
 			req.cycle = _mcdram[mcdram_select]->access(req, 0, 4);
 			_mc_bw_per_step += 4;
 			req.lineAddr = address;
 			data_ready_cycle = req.cycle;
-			
+
 			uint64_t bit = (address - tag * 64) / 4;
 			assert(bit < 16 && bit >= 0);
 			bit = ((uint64_t)1UL) << bit;
@@ -623,7 +623,7 @@ MemoryController::access(MemReq& req)
 				_tlb[tag].dirty_bitvec |= bit;
 		}
 
-		//// data access  
+		//// data access
 		if (_scheme == HMA) {
 			req.lineAddr = mc_address; //transMCAddressPage(set_num, hit_way); //mc_address;
 			req.cycle = _mcdram[mcdram_select]->access(req, 0, 4);
@@ -669,7 +669,7 @@ MemoryController::access(MemReq& req)
 	}
 
 	// TODO. Make the timing info here correct.
-	// TODO. should model system level stall 
+	// TODO. should model system level stall
 	if (_scheme == HMA && _num_requests % _os_quantum == 0) {
       	uint64_t num_replace = _os_placement_policy->remapPages();
 		_numPlacement.inc(num_replace * 2);
@@ -677,7 +677,7 @@ MemoryController::access(MemReq& req)
 
 	if (_num_requests % step_length == 0)
 	{
-		_num_hit_per_step /= 2;	
+		_num_hit_per_step /= 2;
 		_num_miss_per_step /= 2;
 		_mc_bw_per_step /= 2;
 		_ext_bw_per_step /= 2;
@@ -685,30 +685,30 @@ MemoryController::access(MemReq& req)
 			// adjust _ds_index	based on mc vs. ext dram bandwidth.
 			double ratio = 1.0 * _mc_bw_per_step / (_mc_bw_per_step + _ext_bw_per_step);
 			double target_ratio = 0.8;  // because mc_bw = 4 * ext_bw
-	
-			// the larger the gap between ratios, the more _ds_index changes. 
+
+			// the larger the gap between ratios, the more _ds_index changes.
 			// _ds_index changes in the granualrity of 1/1000 dram cache capacity.
-			// 1% in the ratio difference leads to 1/1000 _ds_index change. 		
-			// 300 is arbitrarily chosen. 
+			// 1% in the ratio difference leads to 1/1000 _ds_index change.
+			// 300 is arbitrarily chosen.
 			// XXX XXX XXX
 			// 1000 is only used for graph500 and pagerank.
-			//uint64_t index_step = _num_sets / 300; // in terms of the number of sets 
-			uint64_t index_step = _num_sets / 1000; // in terms of the number of sets 
-			int64_t delta_index = (ratio - target_ratio > -0.02 && ratio - target_ratio < 0.02)? 
+			//uint64_t index_step = _num_sets / 300; // in terms of the number of sets
+			uint64_t index_step = _num_sets / 1000; // in terms of the number of sets
+			int64_t delta_index = (ratio - target_ratio > -0.02 && ratio - target_ratio < 0.02)?
 					0 : index_step * (ratio - target_ratio) / 0.01;
 			printf("ratio = %f\n", ratio);
 			if (delta_index > 0) {
 				// _ds_index will increase. All dirty data between _ds_index and _ds_index + delta_index
 				// should be written back to external dram.
-				// For Alloy cache, this is relatively easy. 
-				// For Hybrid, we need to update tag buffer as well... 
+				// For Alloy cache, this is relatively easy.
+				// For Hybrid, we need to update tag buffer as well...
 				for (uint32_t mc = 0; mc < _mcdram_per_mc; mc ++) {
 					for (uint64_t set = _ds_index; set < (uint64_t)(_ds_index + delta_index); set ++) {
 						if (set >= _num_sets) break;
 						for (uint32_t way = 0; way < _num_ways; way ++)	 {
 							Way &meta = _cache[set].ways[way];
 							if (meta.valid && meta.dirty) {
-								// should write back to external dram. 					
+								// should write back to external dram.
 						        MemReq load_req = {meta.tag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
 								_mcdram[mc]->access(load_req, 2, (_granularity / 64)*4);
 						        MemReq wb_req = {meta.tag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
@@ -718,7 +718,7 @@ MemoryController::access(MemReq& req)
 							}
 							if (_scheme == HybridCache && meta.valid) {
 				           		_tlb[meta.tag].way = _num_ways;
-								// for Hybrid cache, should insert to tag buffer as well. 
+								// for Hybrid cache, should insert to tag buffer as well.
 								if (!_tag_buffer->canInsert(meta.tag)) {
 									printf("Rebalance. [Tag Buffer FLUSH] occupancy = %f\n", _tag_buffer->getOccupancy());
 									_tag_buffer->clearTagBuffer();
@@ -740,15 +740,25 @@ MemoryController::access(MemReq& req)
 			printf("_ds_index = %ld/%ld\n", _ds_index, _num_sets);
 		}
 	}
+
+#if 0
+	//print tlb
+	if(_tlb.find(tag) != _tlb.end())
+	{
+		info("MC cache hit ,address is 0x%lx , tag is 0x%lx, print tlb entry.tag:0x%lx : ", req.lineAddr, tag, (*(this->getTLB()))[tag].tag );
+	}
+
+#endif
+
  	futex_unlock(&_lock);
 	//uint64_t latency = req.cycle - orig_cycle;
 	//req.cycle = orig_cycle;
 	return data_ready_cycle; //req.cycle + latency;
 }
 
-DDRMemory* 
-MemoryController::BuildDDRMemory(Config& config, uint32_t frequency, 
-								 uint32_t domain, g_string name, const string& prefix, uint32_t tBL, double timing_scale) 
+DDRMemory*
+MemoryController::BuildDDRMemory(Config& config, uint32_t frequency,
+								 uint32_t domain, g_string name, const string& prefix, uint32_t tBL, double timing_scale)
 {
     uint32_t ranksPerChannel = config.get<uint32_t>(prefix + "ranksPerChannel", 4);
     uint32_t banksPerRank = config.get<uint32_t>(prefix + "banksPerRank", 8);  // DDR3 std is 8
@@ -773,7 +783,7 @@ MemoryController::BuildDDRMemory(Config& config, uint32_t frequency,
     return mem;
 }
 
-void 
+void
 MemoryController::initStats(AggregateStat* parentStat)
 {
 	AggregateStat* memStats = new AggregateStat();
@@ -787,35 +797,35 @@ MemoryController::initStats(AggregateStat* parentStat)
 	_numStoreHit.init("storeHit", "Store Hit"); memStats->append(&_numStoreHit);
 	_numStoreMiss.init("storeMiss", "Store Miss"); memStats->append(&_numStoreMiss);
 	_numCounterAccess.init("counterAccess", "Counter Access"); memStats->append(&_numCounterAccess);
-	
+
 	_numTagLoad.init("tagLoad", "Number of tag loads"); memStats->append(&_numTagLoad);
 	_numTagStore.init("tagStore", "Number of tag stores"); memStats->append(&_numTagStore);
 	_numTagBufferFlush.init("tagBufferFlush", "Number of tag buffer flushes"); memStats->append(&_numTagBufferFlush);
 
 	_numTBDirtyHit.init("TBDirtyHit", "Tag buffer hits (LLC dirty evict)"); memStats->append(&_numTBDirtyHit);
 	_numTBDirtyMiss.init("TBDirtyMiss", "Tag buffer misses (LLC dirty evict)"); memStats->append(&_numTBDirtyMiss);
-	
+
 	_numTouchedLines.init("totalTouchLines", "total # of touched lines in UnisonCache"); memStats->append(&_numTouchedLines);
 	_numEvictedLines.init("totalEvictLines", "total # of evicted lines in UnisonCache"); memStats->append(&_numEvictedLines);
 
 	_ext_dram->initStats(memStats);
-	for (uint32_t i = 0; i < _mcdram_per_mc; i++) 
+	for (uint32_t i = 0; i < _mcdram_per_mc; i++)
 		_mcdram[i]->initStats(memStats);
 
     parentStat->append(memStats);
 }
 
 
-Address 
+Address
 MemoryController::transMCAddress(Address mc_addr)
 {
 	// 28 lines per DRAM row (2048 KB row)
-	uint64_t num_lines_per_mc = 128*1024*1024 / 2048 * 28; 
+	uint64_t num_lines_per_mc = 128*1024*1024 / 2048 * 28;
 	uint64_t set = mc_addr % num_lines_per_mc;
-	return set / 28 * 32 + set % 28; 
+	return set / 28 * 32 + set % 28;
 }
 
-Address 
+Address
 MemoryController::transMCAddressPage(uint64_t set_num, uint32_t way_num)
 {
 	return (_num_ways * set_num + way_num) * _granularity;
@@ -824,7 +834,7 @@ MemoryController::transMCAddressPage(uint64_t set_num, uint32_t way_num)
 TagBuffer::TagBuffer(Config & config)
 {
 	uint32_t tb_size = config.get<uint32_t>("sys.mem.mcdram.tag_buffer_size", 1024);
-	_num_ways = 8; 
+	_num_ways = 8;
 	_num_sets = tb_size / _num_ways;
 	_entry_occupied = 0;
 	_tag_buffer = (TagBufferEntry **) gm_malloc(sizeof(TagBufferEntry *) * _num_sets);
@@ -833,15 +843,15 @@ TagBuffer::TagBuffer(Config & config)
 		_tag_buffer[i] = (TagBufferEntry *) gm_malloc(sizeof(TagBufferEntry) * _num_ways);
 		//_tag_buffer[i] = new TagBufferEntry [_num_ways];
 		for (uint32_t j = 0; j < _num_ways; j ++) {
-			_tag_buffer[i][j].remap = false; 
+			_tag_buffer[i][j].remap = false;
 			_tag_buffer[i][j].tag = 0;
 			_tag_buffer[i][j].lru = j;
 		}
 	}
 }
 
-uint32_t 
-TagBuffer::existInTB(Address tag) 
+uint32_t
+TagBuffer::existInTB(Address tag)
 {
 	uint32_t set_num = tag % _num_sets;
 	for (uint32_t i = 0; i < _num_ways; i++)
@@ -852,20 +862,20 @@ TagBuffer::existInTB(Address tag)
 	return _num_ways;
 }
 
-bool 
+bool
 TagBuffer::canInsert(Address tag)
 {
 #if 1
 	uint32_t num = 0;
-	for (uint32_t i = 0; i < _num_sets; i++) 
-		for (uint32_t j = 0; j < _num_ways; j++) 
+	for (uint32_t i = 0; i < _num_sets; i++)
+		for (uint32_t j = 0; j < _num_ways; j++)
 			if (_tag_buffer[i][j].remap)
 				num ++;
 	assert(num == _entry_occupied);
 #endif
 
 	uint32_t set_num = tag % _num_sets;
-	//printf("tag_buffer=%#lx, set_num=%d, tag_buffer[set_num]=%#lx, num_ways=%d\n", 
+	//printf("tag_buffer=%#lx, set_num=%d, tag_buffer[set_num]=%#lx, num_ways=%d\n",
 	//	(uint64_t)_tag_buffer, set_num, (uint64_t)_tag_buffer[set_num], _num_ways);
 	for (uint32_t i = 0; i < _num_ways; i++)
 		if (!_tag_buffer[set_num][i].remap || _tag_buffer[set_num][i].tag == tag)
@@ -873,7 +883,7 @@ TagBuffer::canInsert(Address tag)
 	return false;
 }
 
-bool 
+bool
 TagBuffer::canInsert(Address tag1, Address tag2)
 {
 	uint32_t set_num1 = tag1 % _num_sets;
@@ -883,25 +893,25 @@ TagBuffer::canInsert(Address tag1, Address tag2)
 	else {
 		uint32_t num = 0;
 		for (uint32_t i = 0; i < _num_ways; i++)
-			if (!_tag_buffer[set_num1][i].remap 
-				|| _tag_buffer[set_num1][i].tag == tag1 
+			if (!_tag_buffer[set_num1][i].remap
+				|| _tag_buffer[set_num1][i].tag == tag1
 				|| _tag_buffer[set_num1][i].tag == tag2)
 				num ++;
 		return num >= 2;
 	}
 }
 
-void 
+void
 TagBuffer::insert(Address tag, bool remap)
 {
 	uint32_t set_num = tag % _num_sets;
 	uint32_t exist_way = existInTB(tag);
 #if 1
-	for (uint32_t i = 0; i < _num_ways; i++) 
-		for (uint32_t j = i+1; j < _num_ways; j++) { 
+	for (uint32_t i = 0; i < _num_ways; i++)
+		for (uint32_t j = i+1; j < _num_ways; j++) {
 			//if (_tag_buffer[set_num][i].tag != 0 && _tag_buffer[set_num][i].tag == _tag_buffer[set_num][j].tag) {
-			//	for (uint32_t k = 0; k < _num_ways; k++) 
-			//		printf("_tag_buffer[%d][%d]: tag=%ld, remap=%d\n", 
+			//	for (uint32_t k = 0; k < _num_ways; k++)
+			//		printf("_tag_buffer[%d][%d]: tag=%ld, remap=%d\n",
 			//			set_num, k, _tag_buffer[set_num][k].tag, _tag_buffer[set_num][k].remap);
 			//}
 			assert(_tag_buffer[set_num][i].tag != _tag_buffer[set_num][j].tag
@@ -931,16 +941,16 @@ TagBuffer::insert(Address tag, bool remap)
 	assert(replace_way != _num_ways);
 	_tag_buffer[set_num][replace_way].tag = tag;
 	_tag_buffer[set_num][replace_way].remap = remap;
-	if (!remap) { 
+	if (!remap) {
 		//printf("\tset=%d way=%d, insert. no remap\n", set_num, replace_way);
 		updateLRU(set_num, replace_way);
-	} else { 
+	} else {
 		//printf("set=%d way=%d, insert\n", set_num, replace_way);
 		_entry_occupied ++;
 	}
 }
 
-void 
+void
 TagBuffer::updateLRU(uint32_t set_num, uint32_t way)
 {
 	assert(!_tag_buffer[set_num][way].remap);
@@ -950,13 +960,13 @@ TagBuffer::updateLRU(uint32_t set_num, uint32_t way)
 	_tag_buffer[set_num][way].lru = 0;
 }
 
-void 
-TagBuffer::clearTagBuffer() 
+void
+TagBuffer::clearTagBuffer()
 {
 	_entry_occupied = 0;
 	for (uint32_t i = 0; i < _num_sets; i++) {
 		for (uint32_t j = 0; j < _num_ways; j ++) {
-			_tag_buffer[i][j].remap = false; 
+			_tag_buffer[i][j].remap = false;
 			_tag_buffer[i][j].tag = 0;
 			_tag_buffer[i][j].lru = j;
 		}

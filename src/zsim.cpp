@@ -829,7 +829,7 @@ uint32_t CountActiveThreads() {
 }
 
 void SimThreadStart(THREADID tid) {
-    info("Thread %d starting", tid);
+    //info("Thread %d starting", tid);
     if (tid > MAX_THREADS) panic("tid > MAX_THREADS");
     zinfo->sched->start(procIdx, tid, procTreeNode->getMask());
     activeThreads[tid] = true;
@@ -1335,7 +1335,7 @@ class SyncEvent: public Event {
 
 VOID FFThread(VOID* arg) {
     futex_lock(&zinfo->ffToggleLocks[procIdx]); //initialize
-    info("FF control Thread TID %ld", syscall(SYS_gettid));
+    //info("FF control Thread TID %ld", syscall(SYS_gettid));
 
     while (true) {
         //block ourselves until someone wakes us up with an unlock
