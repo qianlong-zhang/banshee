@@ -69,6 +69,7 @@ class SetAssocArray : public CacheArray {
         SetAssocArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
 
         int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement);
+        int32_t lookup_DC(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc);
         uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr);
         void postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate);
 };

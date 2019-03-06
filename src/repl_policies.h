@@ -141,6 +141,84 @@ class LRUReplPolicy : public ReplPolicy {
         }
 };
 
+//zql: Dram Cache aware LRU
+template <bool sharersAware>
+class LRUDCReplPolicy : public LRUReplPolicy<true> {
+    protected:
+        uint64_t timestamp; // incremented on each access
+		class _array{
+			uint64_t count;
+			bool in_dram_cache;
+		} *array;
+        uint32_t numLines;
+
+    public:
+        explicit LRUDCReplPolicy(uint32_t _numLines) : timestamp(1), numLines(_numLines) {
+            array = gm_calloc<class _array>(numLines);
+        }
+
+        ~LRUDCReplPolicy() {
+            gm_free(array);
+        }
+        void update(uint32_t id, const MemReq* req) {
+			assert(false);
+		}
+
+        void update(uint32_t id, const MemReq* req, bool in_dram_cache) {
+            array[id].count = timestamp++;
+			array[id].in_dram_cache = in_dram_cache;
+        }
+
+        void replaced(uint32_t id) {
+            array[id].count = 0;
+			array[id].in_dram_cache = false;
+        }
+
+        template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+            uint32_t bestCand = -1;
+            uint32_t secondCand = -1;
+            uint64_t bestScore = (uint64_t)-1L;
+            uint64_t secondScore = (uint64_t)-1L;
+			bool hit_dram_cache = false;
+			C temp_cands = cands;
+
+			//cachelines hit in dram cache should be replaced first
+            for (auto ci = temp_cands.begin(); ci != temp_cands.end(); ci.inc()) {
+				if (array[*ci].in_dram_cache == true)
+				{
+					hit_dram_cache = true;
+					uint32_t s = score(*ci);
+					bestCand = (s < bestScore)? *ci : bestCand;
+					bestScore = MIN(s, bestScore);
+				}
+			}
+
+			//reset temp_cands
+			temp_cands = cands;
+            for (auto ci = temp_cands.begin(); ci != temp_cands.end(); ci.inc()) {
+                uint32_t s = score(*ci);
+                secondCand = (s < secondScore)? *ci : secondCand;
+                secondScore = MIN(s, secondScore);
+            }
+			if(hit_dram_cache)
+				return bestCand;
+			else
+				return secondCand;
+        }
+
+        DECL_RANK_BINDINGS;
+
+    private:
+        inline uint64_t score(uint32_t id) { //higher is least evictable
+            //array[id] < timestamp always, so this prioritizes by:
+            // (1) valid (if not valid, it's 0)
+            // (2) sharers, and
+            // (3) timestamp
+            return (sharersAware? cc->numSharers(id) : 0)*timestamp + array[id].count*cc->isValid(id);
+        }
+};
+
+
 //This is VERY inefficient, uses LRU timestamps to do something that in essence requires a few bits.
 //If you want to use this frequently, consider a reimplementation
 class TreeLRUReplPolicy : public LRUReplPolicy<true> {

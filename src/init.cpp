@@ -151,6 +151,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
 
     //Replacement policy
     string replType = config.get<const char*>(prefix + "repl.type", (arrayType == "IdealLRUPart")? "IdealLRUPart" : "LRU");
+	info("cache replace policy is %s", replType.c_str());
     ReplPolicy* rp = nullptr;
 
     if (replType == "LRU" || replType == "LRUNoSh") {
@@ -160,7 +161,14 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         } else {
             rp = new LRUReplPolicy<false>(numLines);
         }
-    } else if (replType == "LFU") {
+    } else if (replType == "LRU_DC") {
+        bool sharersAware = (replType == "LRU_DC") && !isTerminal;
+        if (sharersAware) {
+            rp = new LRUDCReplPolicy<true>(numLines);
+        } else {
+            rp = new LRUDCReplPolicy<false>(numLines);
+        }
+	}else if (replType == "LFU") {
         rp = new LFUReplPolicy(numLines);
     } else if (replType == "LRUProfViol") {
         ProfViolReplPolicy< LRUReplPolicy<true> >* pvrp = new ProfViolReplPolicy< LRUReplPolicy<true> >(numLines);
@@ -555,8 +563,8 @@ static void InitSystem(Config& config) {
 		else
 		{
 			assert(memControllers == 1);
-			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem0(NULL);
-			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem1(dynamic_cast<MemoryController*>(mems[0])->getTLB());
+			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem0(dynamic_cast<MemoryController*>(mems[0])->getTLB());
+			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem1(NULL);
 		}
 	}
 

@@ -47,6 +47,17 @@ int32_t SetAssocArray::lookup(const Address lineAddr, const MemReq* req, bool up
     }
     return -1;
 }
+int32_t SetAssocArray::lookup_DC(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc) {
+    uint32_t set = hf->hash(0, lineAddr) & setMask;
+    uint32_t first = set*assoc;
+    for (uint32_t id = first; id < first + assoc; id++) {
+        if (array[id] ==  lineAddr) {
+            if (updateReplacement) rp->update(id, req, hit_in_dc);
+            return id;
+        }
+    }
+    return -1;
+}
 
 uint32_t SetAssocArray::preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr) { //TODO: Give out valid bit of wb cand?
     uint32_t set = hf->hash(0, lineAddr) & setMask;
