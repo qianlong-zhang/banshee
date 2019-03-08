@@ -123,35 +123,25 @@ uint64_t TimingCache::access(MemReq& req) {
 
 	//see wether hit in MC cache?
 	bool dram_cache_hit=false;
-#if 0
+#if 1
 	//assert this cache is timing cache, because we assume TLB only exist in LLC timing cache
-	std::string cache_name = this->getName();
 	//if ( (cache_name.find("l3") != std::string::npos) && (this->get_repl_name() == "LRU_DC") )
 	if (this->get_repl_name() == "LRU_DC")
 	{
-		//info("this pointer is %p, cache_name is %s, is llc? %s, dram cache granu is %d", this, cache_name.c_str(), this->if_is_llc()?"True":"false", this->get_dram_cache_granu());
+		//info("this pointer is %p, cache_name is %s, is llc? %s, dram cache granu is %d", this, this->getName().c_str(), this->if_is_llc()?"True":"false", this->get_dram_cache_granu());
 		assert(this->get_dram_cache_granu() != 0);
-		//assert(this->if_is_llc());
 		Address	temp_tag = req.lineAddr / (this->get_dram_cache_granu() / 64);
+        g_vector<g_unordered_map <Address, TLBEntry>*> tlb_mem;
 		//info("In llc, access address is 0x%lx, tag is 0x%lx", req.lineAddr, temp_tag);
+        for(uint32_t i=0; i<this->getMemCtrls(); i++)
+        {
+            //every LLC should know all tlbs in multiple mc, cause address will interleave in mcs
+            tlb_mem[i] = this->getTLB_mem(i);
+            //info("temp_tag is 0x%lx, temp_tlb0 is %p, temp_tlb1 is %p", temp_tag, temp_tlb0, temp_tlb1);
+            if(tlb_mem[i] != NULL && (tlb_mem[i])->find(temp_tag) != (tlb_mem[i])->end())
+                dram_cache_hit = true;
+        }
 
-		//every LLC should know all tlbs in multiple mc, cause address will interleave in mcs
-		g_unordered_map<Address, TLBEntry> *temp_tlb0 = (dynamic_cast<TimingCache*>(this)->getTLB_mem0());
-		g_unordered_map<Address, TLBEntry> *temp_tlb1 = (dynamic_cast<TimingCache*>(this)->getTLB_mem1());
-		info("temp_tag is 0x%lx, temp_tlb0 is %p, temp_tlb1 is %p", temp_tag, temp_tlb0, temp_tlb1);
-
-#if 0
-		if( temp_tlb0 != NULL && ((*temp_tlb0).find(temp_tag) != (*temp_tlb0).end()))
-		{
-			dram_cache_hit = true;
-			//info("In cache, addr is 0x%lx, tag is 0x%lx, hit in mem0, printing TLB tag = 0x%lx, hit?:%s ",req.lineAddr, temp_tag, (*temp_tlb0)[temp_tag].tag , dram_cache_hit?"True":"false");
-		}
-		if( temp_tlb1 != NULL && ((*temp_tlb1).find(temp_tag) != (*temp_tlb1).end()))
-		{
-			dram_cache_hit = true;
-			//info("In cache, addr is 0x%lx, tag is 0x%lx, hit in mem1, printing TLB tag = 0x%lx, hit?:%s",req.lineAddr, temp_tag, (*temp_tlb1)[temp_tag].tag , dram_cache_hit?"True":"false");
-		}
-#endif
 	}
 #endif
 

@@ -640,12 +640,13 @@ static void InitSystem(Config& config) {
                 //L1 can only be Simple Cache
                 if( ! bank_name.find("l1") )
                 {
+                    TimingCache *temp_bank=NULL;
                     //set TLB in llc to point to the TLB in all MC
                     //mem spliter include multiple mem controllers
                     if( memControllers > 1) {
                         for (uint32_t i=0; i<memControllers; i++)
                         {
-                            TimingCache *temp_bank =  dynamic_cast<TimingCache *>(bank);
+                            temp_bank =  dynamic_cast<TimingCache *>(bank);
                             SplitAddrMemory *temp_split_mem = dynamic_cast<SplitAddrMemory*>(mems[0]);
                             //here mems[0] is SplitAddrMemory
                             MemoryController *temp_mem = dynamic_cast<MemoryController*>(temp_split_mem->getMems(i));
@@ -655,10 +656,12 @@ static void InitSystem(Config& config) {
                     else
                     {
                         assert(memControllers == 1);
-                        TimingCache *temp_bank =  dynamic_cast<TimingCache *>(bank);
+                        temp_bank =  dynamic_cast<TimingCache *>(bank);
                         MemoryController *temp_mem = dynamic_cast<MemoryController*>(mems[0]);
                         temp_bank->setTLB_mem(0, temp_mem->getTLB());
                     }
+                    assert(temp_bank != NULL);
+                    temp_bank->setMemCtrls(memControllers);
                 }
             }
         }

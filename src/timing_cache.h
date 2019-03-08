@@ -60,6 +60,7 @@ class TimingCache : public Cache {
 		bool is_llc;
 		g_vector<g_unordered_map <Address, TLBEntry>*> _tlb_mem;
         uint32_t dram_cache_granularity;
+        uint32_t memControllers;
 
     public:
         TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t tagLat, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, std::string &replType);
@@ -80,6 +81,8 @@ class TimingCache : public Cache {
         uint32_t get_dram_cache_granu() { return dram_cache_granularity ; };
         void  set_dram_cache_granu(uint32_t granu) { dram_cache_granularity =granu; };
         void set_repl_name(std::string name) {  repl_type = name;} ;
+        void setMemCtrls(uint32_t mem_ctrls) {  memControllers = mem_ctrls;} ;
+        uint32_t getMemCtrls() {  return memControllers;} ;
         std::string get_repl_name() {  return repl_type;} ;
         bool if_is_llc() { return is_llc;} ;
         void set_llc(bool llc) {  is_llc = llc;} ;
