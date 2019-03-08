@@ -148,7 +148,7 @@ class WayPartReplPolicy : public PartReplPolicy, public LegacyReplPolicy {
             parentStat->append(partsStat);
         }
 
-        void update(uint32_t id, const MemReq* req) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
             WayPartInfo* e = &array[id];
             if (e->ts > 0) { //this is a hit update
                 partInfo[e->p].profHits.inc();
@@ -393,7 +393,7 @@ class VantageReplPolicy : public PartReplPolicy, public LegacyReplPolicy {
             parentStat->append(rpStat);
         }
 
-        void update(uint32_t id, const MemReq* req) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
             if (unlikely(zinfo->globPhaseCycles > lastUpdateCycle)) {
                 //Update size-cycle counter stats
                 uint64_t diff = zinfo->globPhaseCycles - lastUpdateCycle;

@@ -143,6 +143,7 @@ class PrintExpr {
 { \
     log_lock(); \
     fprintf(logFdOut, "%s", logHeader); \
+    fprintf(logFdOut, "In file  %s line %d: ", __FILE__, __LINE__); \
     fprintf(logFdOut, args); \
     fprintf(logFdOut, "\n"); \
     fflush(logFdOut); \
@@ -153,10 +154,11 @@ class PrintExpr {
  * that happens to conflict with this...
  */
 /* FIXME: Better conditional tracing (e.g., via mask) */
+//#define _LOG_TRACE_
 #ifdef _LOG_TRACE_
 #define trace(type, args...) \
 { \
-    if ( LOG_##type == LOG_Sched) { \
+    if (( LOG_##type == LOG_Cache)) { \
         log_lock(); \
         fprintf(logFdErr, "%sLOG(%s): ", logHeader, logTypeNames[(int) LOG_##type]); \
         fprintf(logFdErr, args); \

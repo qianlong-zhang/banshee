@@ -78,7 +78,7 @@ class ReplAccessEvent : public TimingEvent {
         void simulate(uint64_t startCycle) {cache->simulateReplAccess(this, startCycle);}
 };
 
-TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t _tagLat, uint32_t _ways, uint32_t _cands, uint32_t _domain, const g_string& _name)
+TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t _tagLat, uint32_t _ways, uint32_t _cands, uint32_t _domain, const g_string& _name, std::string & _replType)
     : Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name), numMSHRs(mshrs), tagLat(_tagLat), ways(_ways), cands(_cands)
 {
     lastFreeCycle = 0;
@@ -86,7 +86,8 @@ TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPo
     assert(numMSHRs > 0);
     activeMisses = 0;
     domain = _domain;
-    info("%s: mshrs %d domain %d,  this pointer is %p", name.c_str(), numMSHRs, domain,  this);
+	repl_type = _replType;
+    info("%s: mshrs %d domain %d, replType = %s  ,this pointer is %p", name.c_str(), numMSHRs, domain, repl_type.c_str(),  this);
 }
 
 void TimingCache::initStats(AggregateStat* parentStat) {
@@ -121,23 +122,25 @@ uint64_t TimingCache::access(MemReq& req) {
 
 
 	//see wether hit in MC cache?
-#if 1
 	bool dram_cache_hit=false;
+#if 0
 	//assert this cache is timing cache, because we assume TLB only exist in LLC timing cache
 	std::string cache_name = this->getName();
-	if ( cache_name.find("l3") != std::string::npos )
+	//if ( (cache_name.find("l3") != std::string::npos) && (this->get_repl_name() == "LRU_DC") )
+	if (this->get_repl_name() == "LRU_DC")
 	{
 		//info("this pointer is %p, cache_name is %s, is llc? %s, dram cache granu is %d", this, cache_name.c_str(), this->if_is_llc()?"True":"false", this->get_dram_cache_granu());
 		assert(this->get_dram_cache_granu() != 0);
-		assert(this->if_is_llc());
+		//assert(this->if_is_llc());
 		Address	temp_tag = req.lineAddr / (this->get_dram_cache_granu() / 64);
 		//info("In llc, access address is 0x%lx, tag is 0x%lx", req.lineAddr, temp_tag);
 
 		//every LLC should know all tlbs in multiple mc, cause address will interleave in mcs
 		g_unordered_map<Address, TLBEntry> *temp_tlb0 = (dynamic_cast<TimingCache*>(this)->getTLB_mem0());
 		g_unordered_map<Address, TLBEntry> *temp_tlb1 = (dynamic_cast<TimingCache*>(this)->getTLB_mem1());
-		//info("temp_tlb0 is %p, temp_tlb1 is %p", temp_tlb0, temp_tlb1);
+		info("temp_tag is 0x%lx, temp_tlb0 is %p, temp_tlb1 is %p", temp_tag, temp_tlb0, temp_tlb1);
 
+#if 0
 		if( temp_tlb0 != NULL && ((*temp_tlb0).find(temp_tag) != (*temp_tlb0).end()))
 		{
 			dram_cache_hit = true;
@@ -148,6 +151,7 @@ uint64_t TimingCache::access(MemReq& req) {
 			dram_cache_hit = true;
 			//info("In cache, addr is 0x%lx, tag is 0x%lx, hit in mem1, printing TLB tag = 0x%lx, hit?:%s",req.lineAddr, temp_tag, (*temp_tlb1)[temp_tag].tag , dram_cache_hit?"True":"false");
 		}
+#endif
 	}
 #endif
 
@@ -155,13 +159,7 @@ uint64_t TimingCache::access(MemReq& req) {
     bool skipAccess = cc->startAccess(req); //may need to skip access due to races (NOTE: may change req.type!)
     if (likely(!skipAccess)) {
         bool updateReplacement = (req.type == GETS) || (req.type == GETX);
-		int32_t lineId = 0;
-		//if config LRU_DC
-		string replType = config.get<const char*>("sys.caches.repl.type", "LRU");
-		if(replType.find("LRU_DC"))
-			 lineId = array->lookup_DC(req.lineAddr, &req, updateReplacement, dram_cache_hit);
-		else
-			lineId = array->lookup(req.lineAddr, &req, updateReplacement);
+		int32_t lineId = array->lookup(req.lineAddr, &req, updateReplacement, dram_cache_hit);
         respCycle += accLat;
 
         if (lineId == -1 /*&& cc->shouldAllocate(req)*/) {
@@ -176,7 +174,7 @@ uint64_t TimingCache::access(MemReq& req) {
             //NOTE: We might be "evicting" an invalid line for all we know. Coherence controllers will know what to do
             evDoneCycle = cc->processEviction(req, wbLineAddr, lineId, respCycle); //if needed, send invalidates/downgrades to lower level, and wb to upper level
 
-            array->postinsert(req.lineAddr, &req, lineId); //do the actual insertion. NOTE: Now we must split insert into a 2-phase thing because cc unlocks us.
+            array->postinsert(req.lineAddr, &req, lineId, dram_cache_hit); //do the actual insertion. NOTE: Now we must split insert into a 2-phase thing because cc unlocks us.
 
             if (evRec->hasRecord()) writebackRecord = evRec->popRecord();
         }

@@ -36,18 +36,7 @@ SetAssocArray::SetAssocArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _r
     assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
-int32_t SetAssocArray::lookup(const Address lineAddr, const MemReq* req, bool updateReplacement) {
-    uint32_t set = hf->hash(0, lineAddr) & setMask;
-    uint32_t first = set*assoc;
-    for (uint32_t id = first; id < first + assoc; id++) {
-        if (array[id] ==  lineAddr) {
-            if (updateReplacement) rp->update(id, req);
-            return id;
-        }
-    }
-    return -1;
-}
-int32_t SetAssocArray::lookup_DC(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc) {
+int32_t SetAssocArray::lookup(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc) {
     uint32_t set = hf->hash(0, lineAddr) & setMask;
     uint32_t first = set*assoc;
     for (uint32_t id = first; id < first + assoc; id++) {
@@ -69,10 +58,10 @@ uint32_t SetAssocArray::preinsert(const Address lineAddr, const MemReq* req, Add
     return candidate;
 }
 
-void SetAssocArray::postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate) {
+void SetAssocArray::postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate, bool hit_in_dc) {
     rp->replaced(candidate);
     array[candidate] = lineAddr;
-    rp->update(candidate, req);
+    rp->update(candidate, req, hit_in_dc);
 }
 
 
@@ -106,7 +95,7 @@ void ZArray::initStats(AggregateStat* parentStat) {
     parentStat->append(objStats);
 }
 
-int32_t ZArray::lookup(const Address lineAddr, const MemReq* req, bool updateReplacement) {
+int32_t ZArray::lookup(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc) {
     /* Be defensive: If the line is 0, panic instead of asserting. Now this can
      * only happen on a segfault in the main program, but when we move to full
      * system, phy page 0 might be used, and this will hit us in a very subtle
@@ -118,7 +107,7 @@ int32_t ZArray::lookup(const Address lineAddr, const MemReq* req, bool updateRep
         uint32_t lineId = lookupArray[w*numSets + (hf->hash(w, lineAddr) & setMask)];
         if (array[lineId] == lineAddr) {
             if (updateReplacement) {
-                rp->update(lineId, req);
+                rp->update(lineId, req, hit_in_dc);
             }
             return lineId;
         }
@@ -210,7 +199,7 @@ uint32_t ZArray::preinsert(const Address lineAddr, const MemReq* req, Address* w
     return bestCandidate;
 }
 
-void ZArray::postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate) {
+void ZArray::postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate, bool hit_in_dc) {
     //We do the swaps in lookupArray, the array stays the same
     assert(lookupArray[swapArray[0]] == candidate);
     for (uint32_t i = 0; i < swapArrayLen-1; i++) {
@@ -222,7 +211,7 @@ void ZArray::postinsert(const Address lineAddr, const MemReq* req, uint32_t cand
 
     rp->replaced(candidate);
     array[candidate] = lineAddr;
-    rp->update(candidate, req);
+    rp->update(candidate, req, hit_in_dc);
 
     statSwaps.inc(swapArrayLen-1);
 }

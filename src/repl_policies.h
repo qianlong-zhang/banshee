@@ -47,7 +47,7 @@ class ReplPolicy : public GlobAlloc {
 
         virtual void setCC(CC* _cc) {cc = _cc;}
 
-        virtual void update(uint32_t id, const MemReq* req) = 0;
+        virtual void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) = 0;
         virtual void replaced(uint32_t id) = 0;
 
         virtual uint32_t rankCands(const MemReq* req, SetAssocCands cands) = 0;
@@ -110,7 +110,7 @@ class LRUReplPolicy : public ReplPolicy {
             gm_free(array);
         }
 
-        void update(uint32_t id, const MemReq* req) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
             array[id] = timestamp++;
         }
 
@@ -143,10 +143,10 @@ class LRUReplPolicy : public ReplPolicy {
 
 //zql: Dram Cache aware LRU
 template <bool sharersAware>
-class LRUDCReplPolicy : public LRUReplPolicy<true> {
+class LRUDCReplPolicy : public ReplPolicy {
     protected:
         uint64_t timestamp; // incremented on each access
-		class _array{
+		struct _array{
 			uint64_t count;
 			bool in_dram_cache;
 		} *array;
@@ -160,13 +160,10 @@ class LRUDCReplPolicy : public LRUReplPolicy<true> {
         ~LRUDCReplPolicy() {
             gm_free(array);
         }
-        void update(uint32_t id, const MemReq* req) {
-			assert(false);
-		}
 
-        void update(uint32_t id, const MemReq* req, bool in_dram_cache) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
             array[id].count = timestamp++;
-			array[id].in_dram_cache = in_dram_cache;
+			array[id].in_dram_cache = hit_in_dc;
         }
 
         void replaced(uint32_t id) {
@@ -292,7 +289,7 @@ class NRUReplPolicy : public LegacyReplPolicy {
             gm_free(candArray);
         }
 
-        void update(uint32_t id, const MemReq* req) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc ) {
             //if (array[id]) info("update PRE %d %d %d", id, array[id], youngLines);
             youngLines += 1 - (array[id] >> 1); //+0 if young, +1 if old
             array[id] |= 0x2;
@@ -349,7 +346,7 @@ class RandReplPolicy : public LegacyReplPolicy {
             gm_free(candArray);
         }
 
-        void update(uint32_t id, const MemReq* req) {}
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {}
 
         void recordCandidate(uint32_t id) {
             candArray[candIdx++] = id;
@@ -422,7 +419,7 @@ class LFUReplPolicy : public LegacyReplPolicy {
             gm_free(array);
         }
 
-        void update(uint32_t id, const MemReq* req) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
             //ts is the "center of mass" of all the accesses, i.e. the average timestamp
             array[id].ts = (array[id].acc*array[id].ts + timestamp)/(array[id].acc + 1);
             array[id].acc++;
@@ -496,8 +493,8 @@ class ProfViolReplPolicy : public T {
             parentStat->append(&profNoViolEv);
         }
 
-        void update(uint32_t id, const MemReq* req) {
-            T::update(id, req);
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
+            T::update(id, req, hit_in_dc);
 
             bool read = (req->type == GETS);
             assert(read || req->type == GETX);
@@ -527,7 +524,7 @@ class ProfViolReplPolicy : public T {
             if (read) accTimes[id].read  = MAX(accTimes[id].read,  req->cycle);
             else      accTimes[id].write = MAX(accTimes[id].write, req->cycle);
 
-            T::update(id, req);
+            T::update(id, req, hit_in_dc);
         }
 
         void startReplacement(const MemReq* req) {

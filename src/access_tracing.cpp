@@ -22,7 +22,7 @@
  * You should have received a copy of the GNU General Public License along with
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
-#define KERNEL_VERSION_UNDER_4
+//#define KERNEL_VERSION_UNDER_4
 
 #ifdef KERNEL_VERSION_UNDER_4
   #include <hdf5.h>

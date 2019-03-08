@@ -293,7 +293,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
 			uint32_t dram_cache_granularity = config.get<uint32_t>("sys.mem.mcdram.cache_granularity");
 			//info(" dram_cache_granularity is %d", dram_cache_granularity);
-            cache = new TimingCache(numLines, cc, array, rp, accLat, invLat, mshrs, tagLat, ways, timingCandidates, domain, name);
+            cache = new TimingCache(numLines, cc, array, rp, accLat, invLat, mshrs, tagLat, ways, timingCandidates, domain, name, replType);
 			dynamic_cast<TimingCache*>(cache)->set_llc(is_llc);
 			dynamic_cast<TimingCache*>(cache)->set_dram_cache_granu(dram_cache_granularity);
         } else if (type == "Tracing") {
@@ -491,6 +491,15 @@ static void InitSystem(Config& config) {
 		//info("mems[%d] tlb is :%p", i, dynamic_cast<MemoryController*>(mems[i])->getTLB()); //every mc has unique tlb
     }
 
+    if (memControllers > 1) {
+        bool splitAddrs = config.get<bool>("sys.mem.splitAddrs", true);
+        if (splitAddrs) {
+            MemObject* splitter = new SplitAddrMemory(mems, "mem-splitter", config);
+            mems.resize(1);
+            mems[0] = splitter;
+        }
+    }
+
     // Build the caches
     vector<const char*> cacheGroupNames;
     config.subgroups("sys.caches", cacheGroupNames);
@@ -554,29 +563,7 @@ static void InitSystem(Config& config) {
     for (BaseCache* llcBank : (*cMap[llc])[0]) {
 		//info("Seting LLC parenats\n");
         llcBank->setParents(childId++, mems, network);
-
-		//set TLB in llc to point to the TLB in all MC
-		if( memControllers == 2) {
-			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem0(dynamic_cast<MemoryController*>(mems[0])->getTLB());
-			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem1(dynamic_cast<MemoryController*>(mems[1])->getTLB());
-		}
-		else
-		{
-			assert(memControllers == 1);
-			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem0(dynamic_cast<MemoryController*>(mems[0])->getTLB());
-			dynamic_cast<TimingCache *>(llcBank)->setTLB_mem1(NULL);
-		}
 	}
-
-    if (memControllers > 1) {
-        bool splitAddrs = config.get<bool>("sys.mem.splitAddrs", true);
-        if (splitAddrs) {
-            MemObject* splitter = new SplitAddrMemory(mems, "mem-splitter", config);
-            mems.resize(1);
-            mems[0] = splitter;
-        }
-    }
-
 
     // Rest of caches
     for (const char* grp : cacheGroupNames) {
@@ -617,7 +604,7 @@ static void InitSystem(Config& config) {
                   "Use multiple groups for non-homogeneous children per parent!", grp, parents, children);
         }
 
-		//info("children = %d, parents=%d\n", children, parents);
+		info("children = %d, parents=%d\n", children, parents);
         for (uint32_t p = 0; p < parents; p++) {
             g_vector<MemObject*> parentsVec;
             parentsVec.insert(parentsVec.end(), parentCaches[p].begin(), parentCaches[p].end()); //BaseCache* to MemObject* is a safe cast
@@ -626,7 +613,7 @@ static void InitSystem(Config& config) {
             g_vector<BaseCache*> childrenVec;
             for (uint32_t c = p*childrenPerParent; c < (p+1)*childrenPerParent; c++) {
                 for (BaseCache* bank : childCaches[c]) {
-					//printf("bank=%s, parents.size=%ld\n", bank->getName(), parentsVec.size());
+					info("bank=%s, parents.size=%ld\n", bank->getName(), parentsVec.size());
                     bank->setParents(childId++, parentsVec, network);
                     childrenVec.push_back(bank);
                 }
@@ -646,10 +633,38 @@ static void InitSystem(Config& config) {
             }
 
             for (BaseCache* bank : parentCaches[p]) {
+                info("Seting children: bank=%s\n", bank->getName());
                 bank->setChildren(childrenVec, network);
+
+                string bank_name = bank->getName();
+                //L1 can only be Simple Cache
+                if( ! bank_name.find("l1") )
+                {
+                    //set TLB in llc to point to the TLB in all MC
+                    //mem spliter include multiple mem controllers
+                    if( memControllers > 1) {
+                        for (uint32_t i=0; i<memControllers; i++)
+                        {
+                            TimingCache *temp_bank =  dynamic_cast<TimingCache *>(bank);
+                            SplitAddrMemory *temp_split_mem = dynamic_cast<SplitAddrMemory*>(mems[0]);
+                            //here mems[0] is SplitAddrMemory
+                            MemoryController *temp_mem = dynamic_cast<MemoryController*>(temp_split_mem->getMems(i));
+                            temp_bank->setTLB_mem(i, temp_mem->getTLB());
+                        }
+                    }
+                    else
+                    {
+                        assert(memControllers == 1);
+                        TimingCache *temp_bank =  dynamic_cast<TimingCache *>(bank);
+                        MemoryController *temp_mem = dynamic_cast<MemoryController*>(mems[0]);
+                        temp_bank->setTLB_mem(0, temp_mem->getTLB());
+                    }
+                }
             }
         }
     }
+
+
 
     //Check that all the terminal caches have a single bank
     for (const char* grp : cacheGroupNames) {

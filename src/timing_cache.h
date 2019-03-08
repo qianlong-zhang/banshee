@@ -47,6 +47,7 @@ class TimingCache : public Cache {
         Counter profHitLat, profMissRespLat, profMissLat;
 
         uint32_t domain;
+        std::string repl_type;
 
         // For zcache replacement simulation (pessimistic, assumes we walk the whole tree)
         uint32_t tagLat, ways, cands;
@@ -57,12 +58,11 @@ class TimingCache : public Cache {
 
         //for tlb in llc
 		bool is_llc;
-		g_unordered_map <Address, TLBEntry> * _tlb_mem0;
-		g_unordered_map <Address, TLBEntry> * _tlb_mem1;
+		g_vector<g_unordered_map <Address, TLBEntry>*> _tlb_mem;
         uint32_t dram_cache_granularity;
 
     public:
-        TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t tagLat, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name);
+        TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t tagLat, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, std::string &replType);
         void initStats(AggregateStat* parentStat);
 
         uint64_t access(MemReq& req);
@@ -73,13 +73,14 @@ class TimingCache : public Cache {
         void simulateMissWriteback(MissWritebackEvent* ev, uint64_t cycle, MissStartEvent* mse);
         void simulateReplAccess(ReplAccessEvent* ev, uint64_t cycle);
 
-	   	void setTLB_mem0(g_unordered_map<Address, TLBEntry> *tlb) { _tlb_mem0 = tlb; };
-	   	void setTLB_mem1(g_unordered_map<Address, TLBEntry> *tlb ) { _tlb_mem1 = tlb; };
 
-	   	g_unordered_map<Address, TLBEntry> * getTLB_mem0() { return _tlb_mem0; };
-	   	g_unordered_map<Address, TLBEntry> * getTLB_mem1() { return _tlb_mem1; };
+        //for LRU_DC
+	   	void setTLB_mem(uint32_t mc_id, g_unordered_map<Address, TLBEntry> *tlb) { _tlb_mem[mc_id] = tlb; };
+	   	g_unordered_map<Address, TLBEntry> * getTLB_mem(uint32_t mc_id) { return _tlb_mem[mc_id]; };
         uint32_t get_dram_cache_granu() { return dram_cache_granularity ; };
         void  set_dram_cache_granu(uint32_t granu) { dram_cache_granularity =granu; };
+        void set_repl_name(std::string name) {  repl_type = name;} ;
+        std::string get_repl_name() {  return repl_type;} ;
         bool if_is_llc() { return is_llc;} ;
         void set_llc(bool llc) {  is_llc = llc;} ;
 

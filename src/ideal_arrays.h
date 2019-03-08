@@ -47,7 +47,7 @@ class IdealLRUArray : public CacheArray {
                 explicit ProxyReplPolicy(IdealLRUArray* _a) : a(_a) {}
                 void setCC(CC* _cc) {a->setCC(cc);}
 
-                void update(uint32_t id, const MemReq* req) {panic("!")}
+                void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) {panic("!")}
                 void replaced(uint32_t id) {panic("!!");}
                 template <typename C> uint32_t rank(const MemReq* req, C cands) {panic("!!!");}
                 void initStats(AggregateStat* parent) {}
@@ -78,7 +78,7 @@ class IdealLRUArray : public CacheArray {
             rp = new ProxyReplPolicy(this);
         }
 
-        int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement) {
+        int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc=false) {
             g_unordered_map<Address, uint32_t>::iterator it = lineMap.find(lineAddr);
             if (it == lineMap.end()) return -1;
 
@@ -96,7 +96,7 @@ class IdealLRUArray : public CacheArray {
             return e->lineId;
         }
 
-        void postinsert(const Address lineAddr, const MemReq* req, uint32_t lineId) {
+        void postinsert(const Address lineAddr, const MemReq* req, uint32_t lineId, bool hit_in_dc) {
             Entry* e = &array[lineId];
 
             //Update addr mapping for lineId
@@ -179,7 +179,7 @@ class IdealLRUPartReplPolicy : public PartReplPolicy {
             }
         }
 
-        void update(uint32_t id, const MemReq* req) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
             Entry* e = &array[id];
             if (e->used) {
                 partInfo[e->p].profHits.inc();
@@ -251,13 +251,13 @@ class IdealLRUPartArray : public CacheArray {
             lineAddrs = gm_calloc<Address>(numLines);
         }
 
-        int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement) {
+        int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc=false) {
             g_unordered_map<Address, uint32_t>::iterator it = lineMap.find(lineAddr);
             if (it == lineMap.end()) return -1;
 
             uint32_t lineId = it->second;
             if (updateReplacement) {
-                rp->update(lineId, req);
+                rp->update(lineId, req, hit_in_dc);
             }
             return lineId;
         }
@@ -268,7 +268,7 @@ class IdealLRUPartArray : public CacheArray {
             return lineId;
         }
 
-        void postinsert(const Address lineAddr, const MemReq* req, uint32_t lineId) {
+        void postinsert(const Address lineAddr, const MemReq* req, uint32_t lineId, bool hit_in_dc) {
             //Update addr mapping for lineId
             lineMap.erase(lineAddrs[lineId]);
             assert((lineMap.find(lineAddr) == lineMap.end()));
@@ -277,7 +277,7 @@ class IdealLRUPartArray : public CacheArray {
 
             //Update repl
             rp->replaced(lineId);
-            rp->update(lineId, req);
+            rp->update(lineId, req, hit_in_dc);
         }
 };
 
