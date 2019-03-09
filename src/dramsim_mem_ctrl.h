@@ -117,8 +117,8 @@ class SplitAddrMemory : public MemObject {
             return name.c_str();
         }
 
-        MemObject* getMems( uint32_t mem_id){
-            return mems[mem_id];
+        const g_vector<MemObject*>* getMems(){
+            return &mems;
         };
 
         void initStats(AggregateStat* parentStat) {

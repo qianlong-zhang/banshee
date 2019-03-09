@@ -151,7 +151,6 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
 
     //Replacement policy
     string replType = config.get<const char*>(prefix + "repl.type", (arrayType == "IdealLRUPart")? "IdealLRUPart" : "LRU");
-	info("cache replace policy is %s", replType.c_str());
     ReplPolicy* rp = nullptr;
 
     if (replType == "LRU" || replType == "LRUNoSh") {
@@ -162,6 +161,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             rp = new LRUReplPolicy<false>(numLines);
         }
     } else if (replType == "LRU_DC") {
+        assert(type == "Timing");//only TimingCache can be Dram Cache Aware
         bool sharersAware = (replType == "LRU_DC") && !isTerminal;
         if (sharersAware) {
             rp = new LRUDCReplPolicy<true>(numLines);
@@ -286,20 +286,19 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     rp->setCC(cc);
     if (!isTerminal) {
         if (type == "Simple") {
-            cache = new Cache(numLines, cc, array, rp, accLat, invLat, name);
+            cache = new Cache(numLines, cc, array, rp, accLat, invLat, name, type);
         } else if (type == "Timing") {
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
             uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
 			uint32_t dram_cache_granularity = config.get<uint32_t>("sys.mem.mcdram.cache_granularity");
 			//info(" dram_cache_granularity is %d", dram_cache_granularity);
-            cache = new TimingCache(numLines, cc, array, rp, accLat, invLat, mshrs, tagLat, ways, timingCandidates, domain, name, replType);
-			dynamic_cast<TimingCache*>(cache)->set_llc(is_llc);
-			dynamic_cast<TimingCache*>(cache)->set_dram_cache_granu(dram_cache_granularity);
+            cache = new TimingCache(numLines, cc, array, rp, accLat, invLat, mshrs, tagLat, ways, timingCandidates, domain, name, replType, type);
+			dynamic_cast<TimingCache*>(cache)->setDCGranu(dram_cache_granularity);
         } else if (type == "Tracing") {
             g_string traceFile = config.get<const char*>(prefix + "traceFile","");
             if (traceFile.empty()) traceFile = g_string(zinfo->outputDir) + "/" + name + ".trace";
-            cache = new TracingCache(numLines, cc, array, rp, accLat, invLat, traceFile, name);
+            cache = new TracingCache(numLines, cc, array, rp, accLat, invLat, traceFile, name, type);
         } else {
             panic("Invalid cache type %s", type.c_str());
         }
@@ -307,7 +306,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         //Filter cache optimization
         if (type != "Simple") panic("Terminal cache %s can only have type == Simple", name.c_str());
         if (arrayType != "SetAssoc" || hashType != "None" || replType != "LRU") panic("Invalid FilterCache config %s", name.c_str());
-        cache = new FilterCache(numSets, numLines, cc, array, rp, accLat, invLat, name, config);
+        cache = new FilterCache(numSets, numLines, cc, array, rp, accLat, invLat, name, config, type);
     }
 
 #if 0
@@ -488,7 +487,7 @@ static void InitSystem(Config& config) {
         //uint32_t domain = nextDomain(); //i*zinfo->numDomains/memControllers;
         uint32_t domain = i*zinfo->numDomains/memControllers;
         mems[i] = BuildMemoryController(config, zinfo->lineSize, zinfo->freqMHz, domain, name);
-		//info("mems[%d] tlb is :%p", i, dynamic_cast<MemoryController*>(mems[i])->getTLB()); //every mc has unique tlb
+		info("mems[%d] is :%p, tlb is %p", i, mems[i], dynamic_cast<MemoryController *>(mems[i])->getTLB());
     }
 
     if (memControllers > 1) {
@@ -613,7 +612,7 @@ static void InitSystem(Config& config) {
             g_vector<BaseCache*> childrenVec;
             for (uint32_t c = p*childrenPerParent; c < (p+1)*childrenPerParent; c++) {
                 for (BaseCache* bank : childCaches[c]) {
-					info("bank=%s, parents.size=%ld\n", bank->getName(), parentsVec.size());
+					//info("bank=%s, parents.size=%ld\n", bank->getName(), parentsVec.size());
                     bank->setParents(childId++, parentsVec, network);
                     childrenVec.push_back(bank);
                 }
@@ -633,35 +632,24 @@ static void InitSystem(Config& config) {
             }
 
             for (BaseCache* bank : parentCaches[p]) {
-                info("Seting children: bank=%s\n", bank->getName());
+                //info("Seting children: bank=%s\n", bank->getName());
                 bank->setChildren(childrenVec, network);
 
                 string bank_name = bank->getName();
+                //info("setTLB for %s", bank_name.c_str());
                 //L1 can only be Simple Cache
-                if( ! bank_name.find("l1") )
+                if( bank_name.find("l1") == std::string::npos && dynamic_cast<Cache *>(bank)->isTimingCache())
                 {
-                    TimingCache *temp_bank=NULL;
-                    //set TLB in llc to point to the TLB in all MC
-                    //mem spliter include multiple mem controllers
-                    if( memControllers > 1) {
-                        for (uint32_t i=0; i<memControllers; i++)
-                        {
-                            temp_bank =  dynamic_cast<TimingCache *>(bank);
-                            SplitAddrMemory *temp_split_mem = dynamic_cast<SplitAddrMemory*>(mems[0]);
-                            //here mems[0] is SplitAddrMemory
-                            MemoryController *temp_mem = dynamic_cast<MemoryController*>(temp_split_mem->getMems(i));
-                            temp_bank->setTLB_mem(i, temp_mem->getTLB());
-                        }
-                    }
-                    else
+                    TimingCache *temp_bank =  dynamic_cast<TimingCache *>(bank);
+                    info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
+                    if( temp_bank->DramCacheAware())
                     {
-                        assert(memControllers == 1);
-                        temp_bank =  dynamic_cast<TimingCache *>(bank);
-                        MemoryController *temp_mem = dynamic_cast<MemoryController*>(mems[0]);
-                        temp_bank->setTLB_mem(0, temp_mem->getTLB());
+                        info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
+                        temp_bank->setMems(mems[0]);
+                        temp_bank->setMemCtrls(memControllers);
+                        temp_bank->setMemCtrls(memControllers);
+                        info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
                     }
-                    assert(temp_bank != NULL);
-                    temp_bank->setMemCtrls(memControllers);
                 }
             }
         }

@@ -27,6 +27,7 @@
 #include "event_recorder.h"
 #include "timing_event.h"
 #include "zsim.h"
+#include "dramsim_mem_ctrl.h"
 
 // Events
 class HitEvent : public TimingEvent {
@@ -78,8 +79,8 @@ class ReplAccessEvent : public TimingEvent {
         void simulate(uint64_t startCycle) {cache->simulateReplAccess(this, startCycle);}
 };
 
-TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t _tagLat, uint32_t _ways, uint32_t _cands, uint32_t _domain, const g_string& _name, std::string & _replType)
-    : Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name), numMSHRs(mshrs), tagLat(_tagLat), ways(_ways), cands(_cands)
+TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t _tagLat, uint32_t _ways, uint32_t _cands, uint32_t _domain, const g_string& _name, std::string & _replType, std::string & _cacheType)
+    : Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name, _cacheType), numMSHRs(mshrs), tagLat(_tagLat), ways(_ways), cands(_cands)
 {
     lastFreeCycle = 0;
     lastAccCycle = 0;
@@ -87,7 +88,7 @@ TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPo
     activeMisses = 0;
     domain = _domain;
 	repl_type = _replType;
-    info("%s: mshrs %d domain %d, replType = %s  ,this pointer is %p", name.c_str(), numMSHRs, domain, repl_type.c_str(),  this);
+    info("%s: mshrs %d domain %d, replType = %s cacheType:%s ,this pointer is %p", name.c_str(), numMSHRs, domain, repl_type.c_str(),_cacheType.c_str(), this);
 }
 
 void TimingCache::initStats(AggregateStat* parentStat) {
@@ -120,36 +121,52 @@ uint64_t TimingCache::access(MemReq& req) {
     accessRecord.clear();
     uint64_t evDoneCycle = 0;
 
-
-	//see wether hit in MC cache?
-	bool dram_cache_hit=false;
-#if 1
-	//assert this cache is timing cache, because we assume TLB only exist in LLC timing cache
-	//if ( (cache_name.find("l3") != std::string::npos) && (this->get_repl_name() == "LRU_DC") )
-	if (this->get_repl_name() == "LRU_DC")
-	{
-		//info("this pointer is %p, cache_name is %s, is llc? %s, dram cache granu is %d", this, this->getName().c_str(), this->if_is_llc()?"True":"false", this->get_dram_cache_granu());
-		assert(this->get_dram_cache_granu() != 0);
-		Address	temp_tag = req.lineAddr / (this->get_dram_cache_granu() / 64);
-        g_vector<g_unordered_map <Address, TLBEntry>*> tlb_mem;
-		//info("In llc, access address is 0x%lx, tag is 0x%lx", req.lineAddr, temp_tag);
-        for(uint32_t i=0; i<this->getMemCtrls(); i++)
-        {
-            //every LLC should know all tlbs in multiple mc, cause address will interleave in mcs
-            tlb_mem[i] = this->getTLB_mem(i);
-            //info("temp_tag is 0x%lx, temp_tlb0 is %p, temp_tlb1 is %p", temp_tag, temp_tlb0, temp_tlb1);
-            if(tlb_mem[i] != NULL && (tlb_mem[i])->find(temp_tag) != (tlb_mem[i])->end())
-                dram_cache_hit = true;
-        }
-
-	}
-#endif
-
     uint64_t respCycle = req.cycle;
     bool skipAccess = cc->startAccess(req); //may need to skip access due to races (NOTE: may change req.type!)
     if (likely(!skipAccess)) {
+        bool dram_cache_hit=false;
+        //info("this cache is %s, this->getReplName() is %s ", this->getName(), this->getReplName().c_str() );
+#if 1
+        //assert this cache is timing cache, because we assume TLB only exist in LLC timing cache
+        if(isTimingCache() && DramCacheAware())
+        {
+            //info("this cache is %s", this->getName());
+            //info("this pointer is %p, cache_name is %s, is llc? %s, dram cache granu is %d", this, this->getName().c_str(), this->if_is_llc()?"True":"false", this->get_dram_cache_granu());
+#if 1
+            assert(this->getDCGranu() != 0);
+            Address	temp_tag = req.lineAddr / (this->getDCGranu() / 64);
+            //info("In llc, access address is 0x%lx, tag is 0x%lx", req.lineAddr, temp_tag);
+            g_unordered_map <Address, TLBEntry>* temp_tlb;
+            MemObject* temp_mems = this->getMems();
+            if( this->getMemCtrls()>1 )
+            {
+                for(uint32_t i=0; i<this->getMemCtrls(); i++)
+                {
+                    //info("mems %d pointer is %p", i, (*temp_mems)[i]);
+                    SplitAddrMemory *temp_split = dynamic_cast<SplitAddrMemory*>(temp_mems);
+                    const g_vector<MemObject*>* temp_mems = temp_split->getMems();
+
+                    temp_tlb  = dynamic_cast<MemoryController*>((*temp_mems)[i])->getTLB();
+                    //info("temp_tlb is %p", temp_tlb);
+                    if(temp_tlb != NULL && temp_tlb->find(temp_tag) != temp_tlb->end())
+                       dram_cache_hit = true;
+                }
+            }
+            else
+            {
+                temp_tlb  = dynamic_cast<MemoryController*>(temp_mems)->getTLB();
+                //info("temp_tlb is %p", temp_tlb);
+                if(temp_tlb != NULL && temp_tlb->find(temp_tag) != temp_tlb->end())
+                   dram_cache_hit = true;
+
+            }
+#endif
+
+        }
+#endif
+
         bool updateReplacement = (req.type == GETS) || (req.type == GETX);
-		int32_t lineId = array->lookup(req.lineAddr, &req, updateReplacement, dram_cache_hit);
+        int32_t lineId = array->lookup(req.lineAddr, &req, updateReplacement, dram_cache_hit);
         respCycle += accLat;
 
         if (lineId == -1 /*&& cc->shouldAllocate(req)*/) {

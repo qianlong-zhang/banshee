@@ -48,6 +48,7 @@ class TimingCache : public Cache {
 
         uint32_t domain;
         std::string repl_type;
+        //std::string cacheType;
 
         // For zcache replacement simulation (pessimistic, assumes we walk the whole tree)
         uint32_t tagLat, ways, cands;
@@ -56,14 +57,13 @@ class TimingCache : public Cache {
         lock_t topLock;
         PAD();
 
-        //for tlb in llc
-		bool is_llc;
-		g_vector<g_unordered_map <Address, TLBEntry>*> _tlb_mem;
+        //point to mem controller or SplitAddrMemory to get TLB in them
+        MemObject* mems;
         uint32_t dram_cache_granularity;
         uint32_t memControllers;
 
     public:
-        TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t tagLat, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, std::string &replType);
+        TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t tagLat, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, std::string &replType, std::string &_cacheType);
         void initStats(AggregateStat* parentStat);
 
         uint64_t access(MemReq& req);
@@ -75,17 +75,18 @@ class TimingCache : public Cache {
         void simulateReplAccess(ReplAccessEvent* ev, uint64_t cycle);
 
 
-        //for LRU_DC
-	   	void setTLB_mem(uint32_t mc_id, g_unordered_map<Address, TLBEntry> *tlb) { _tlb_mem[mc_id] = tlb; };
-	   	g_unordered_map<Address, TLBEntry> * getTLB_mem(uint32_t mc_id) { return _tlb_mem[mc_id]; };
-        uint32_t get_dram_cache_granu() { return dram_cache_granularity ; };
-        void  set_dram_cache_granu(uint32_t granu) { dram_cache_granularity =granu; };
-        void set_repl_name(std::string name) {  repl_type = name;} ;
+        void setMems(MemObject* _mems) { mems = _mems;};
+        MemObject* getMems() { return mems;};
+
+        uint32_t getDCGranu() { return dram_cache_granularity ; };
+        void  setDCGranu(uint32_t granu) { dram_cache_granularity =granu; };
+        void setReplName(std::string name) {  repl_type = name;} ;
         void setMemCtrls(uint32_t mem_ctrls) {  memControllers = mem_ctrls;} ;
         uint32_t getMemCtrls() {  return memControllers;} ;
-        std::string get_repl_name() {  return repl_type;} ;
-        bool if_is_llc() { return is_llc;} ;
-        void set_llc(bool llc) {  is_llc = llc;} ;
+        //TODO: getReplName func will lead to memory leak if invoke in TimingCache::access, don't know why :-(
+        std::string getReplName() {  return repl_type;} ;
+        bool DramCacheAware() { return repl_type == "LRU_DC";}
+        //bool isTimingCache() { return cacheType=="Timing"; }
 
     private:
         uint64_t highPrioAccess(uint64_t cycle);

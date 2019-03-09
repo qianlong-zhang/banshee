@@ -62,15 +62,15 @@ class FilterCache : public Cache {
 
         lock_t filterLock;
         uint64_t fGETSHit, fGETXHit;
-		// this is not an accurate tlb. It just randomize the page nums   
+		// this is not an accurate tlb. It just randomize the page nums
 		bool _enable_tlb;
 		drand48_data _buffer;
 		g_unordered_map <Address, Address> _tlb;
-		g_unordered_set <Address> _exist_pgnum; 
+		g_unordered_set <Address> _exist_pgnum;
     public:
         FilterCache(uint32_t _numSets, uint32_t _numLines, CC* _cc, CacheArray* _array,
-                ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, g_string& _name, Config &config)
-            : Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name)
+                ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, g_string& _name, Config &config,std::string _cacheType)
+            : Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name, _cacheType)
         {
             numSets = _numSets;
             setMask = numSets - 1;
@@ -137,7 +137,7 @@ class FilterCache : public Cache {
 			Address pLineAddr;
 			// page num = vLineAddr shifted by 6 bits. So it is shifted by 12 bits in total (4KB page size)
 			if (_enable_tlb) {
-				Address vpgnum = vLineAddr >> 6; 
+				Address vpgnum = vLineAddr >> 6;
 				uint64_t pgnum;
         	    futex_lock(&filterLock);
 				if (_tlb.find(vpgnum) == _tlb.end()) {
@@ -148,10 +148,10 @@ class FilterCache : public Cache {
 					} while (_exist_pgnum.find(pgnum) != _exist_pgnum.end());
 					_tlb[vpgnum] = pgnum;
 					_exist_pgnum.insert( pgnum );
-				} else 
-					pgnum = _tlb[vpgnum];	
-				pLineAddr = procMask | (pgnum << 6) | (vLineAddr & 0x3f); 
-			} else 
+				} else
+					pgnum = _tlb[vpgnum];
+				pLineAddr = procMask | (pgnum << 6) | (vLineAddr & 0x3f);
+			} else
             	pLineAddr = procMask | vLineAddr;
             MESIState dummyState = MESIState::I;
             MemReq req = {pLineAddr, isLoad? GETS : GETX, 0, &dummyState, curCycle, &filterLock, dummyState, srcId, reqFlags};
