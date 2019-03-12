@@ -711,7 +711,7 @@ void VdsoInit() {
     VdsoInsertFunc(vi, "getcpu", VF_GETCPU);
     VdsoInsertFunc(vi, "__vdso_getcpu", VF_GETCPU);
 
-    info("vDSO info initialized");
+    //info("vDSO info initialized");
     IMG_Close(vi);
     remove(file);
 
@@ -1462,7 +1462,7 @@ int main(int argc, char *argv[]) {
         panic("prctl() failed");
     }
 
-    info("Started instance");
+    info("Started instance, myID is %d", getpid());
 
     //Decrease priority to avoid starving system processes (e.g. gluster)
     //setpriority(PRIO_PROCESS, getpid(), 10);
@@ -1523,7 +1523,7 @@ int main(int argc, char *argv[]) {
         cids[i] = UNINITIALIZED_CID;
     }
 
-    info("Started process, PID %d", getpid()); //NOTE: external scripts expect this line, please do not change without checking first
+    //info("Started process, PID %d", getpid()); //NOTE: external scripts expect this line, please do not change without checking first
 
     //Unless things change substantially, keep this disabled; it causes higher imbalance and doesn't solve large system time with lots of processes.
     //Affinity testing code
@@ -1533,7 +1533,7 @@ int main(int argc, char *argv[]) {
     int result = sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpuset);
     info("Affinity result %d", result);*/
 
-    info("procMask: 0x%lx", procMask);
+    //info("procMask: 0x%lx", procMask);
 
     if (zinfo->sched) zinfo->sched->processCleanup(procIdx);
 
@@ -1578,7 +1578,9 @@ int main(int argc, char *argv[]) {
         SimEnd();
     } else {
         // Never returns
+        //info(" flag \n");
         PIN_StartProgram();
+        //info(" flag \n");
     }
     return 0;
 }

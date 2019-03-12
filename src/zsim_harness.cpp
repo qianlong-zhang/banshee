@@ -109,10 +109,11 @@ void chldSigHandler(int sig) {
     assert(sig == SIGCHLD);
     int status;
     int cpid;
+    //info("In %s", __func__);
     while ((cpid = waitpid(-1, &status, WNOHANG)) > 0) {
         int idx = eraseChild(cpid);
         if (idx < MAX_THREADS) {
-            info("Child %d done", cpid);
+            //info("Child %d done", cpid);
             int exitCode = WIFEXITED(status)? WEXITSTATUS(status) : 0;
             if (exitCode == PANIC_EXIT_CODE) {
                 panic("Child issued a panic, killing simulation");
@@ -188,6 +189,7 @@ void exitHandler() {
 void debugSigHandler(int signum, siginfo_t* siginfo, void* dummy) {
     assert(signum == SIGUSR1);
     uint32_t callerPid = siginfo->si_pid;
+    info("master get info from child, starting XtermDebugger");
     // Child better have this initialized...
     struct LibInfo* zsimAddrs = (struct LibInfo*) gm_get_secondary_ptr();
     uint32_t debuggerPid = launchXtermDebugger(callerPid, zsimAddrs);
@@ -231,7 +233,9 @@ static void printHeartbeat(GlobSimInfo* zinfo) {
 
 
 void LaunchProcess(uint32_t procIdx) {
+    info("parent %d", getpid());
     int cpid = fork();
+    info("child %d, forking", cpid);
     if (cpid) { //parent
         assert(cpid > 0);
         childInfo[procIdx].pid = cpid;
@@ -248,8 +252,10 @@ void LaunchProcess(uint32_t procIdx) {
         const char* aptrs[nargs];
 
         trace(Harness, "Calling arguments:");
+        info("Calling arguments:");
         for (unsigned int i = 0; i < args.size(); i++) {
             trace(Harness, " arg%d = %s", i, args[i].c_str());
+            info(" arg%d = %s", i, args[i].c_str());
             aptrs[i] = args[i].c_str();
         }
         aptrs[nargs-1] = nullptr;
@@ -313,7 +319,8 @@ int main(int argc, char *argv[]) {
     }
 
     InitLog("[H] ", nullptr /*log to stdout/err*/);
-    info("Starting zsim, built %s (rev %s)", ZSIM_BUILDDATE, ZSIM_BUILDVERSION);
+    //info("Starting zsim, built %s (rev %s)", ZSIM_BUILDDATE, ZSIM_BUILDVERSION);
+    //info("Harness pid is %d", getpid());
     startTime = time(nullptr);
 
     if (argc != 2) {
@@ -335,6 +342,7 @@ int main(int argc, char *argv[]) {
     signal(SIGTERM, sigHandler);
 
     signal(SIGCHLD, chldSigHandler);
+    //info("chldSigHandler done");
 
     //SIGUSR1 is used by children processes when they want to get a debugger session started;
     struct sigaction debugSa;
@@ -342,7 +350,9 @@ int main(int argc, char *argv[]) {
     sigemptyset(&debugSa.sa_mask); //NOTE: We might want to start using sigfullsets in other signal handlers to avoid races...
     debugSa.sa_sigaction = debugSigHandler;
     if (sigaction(SIGUSR1, &debugSa, nullptr) != 0)
+    {
         panic("sigaction() failed");
+    }
 
     waitid(P_ALL, 0, nullptr, WEXITED);
 
@@ -391,10 +401,13 @@ int main(int argc, char *argv[]) {
     pinCmd = new PinCmd(&conf, configFile, outputDir, shmid);
     uint32_t numProcs = pinCmd->getNumCmdProcs();
 
+    //info("numProcs is %d", numProcs);
     for (uint32_t procIdx = 0; procIdx < numProcs; procIdx++) {
+        //info("dealing Procs %d", procIdx);
         LaunchProcess(procIdx);
     }
 
+    //info("after LaunchProcess pid is %d", getpid());
     if (numProcs == 0) panic("No process config found. Config file needs at least a process0 entry");
 
     //Wait for all processes to finish

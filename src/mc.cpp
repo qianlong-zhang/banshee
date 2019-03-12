@@ -223,8 +223,9 @@ MemoryController::access(MemReq& req)
 	Address address = req.lineAddr;
 	uint32_t mcdram_select = (address / 64) % _mcdram_per_mc;
 	Address mc_address = (address / 64 / _mcdram_per_mc * 64) | (address % 64);
-	//printf("address=%ld, _mcdram_per_mc=%d, mc_address=%ld\n", address, _mcdram_per_mc, mc_address);
+	//info("!!!!!!!!!!!In DramCache, address=0x%lx, _mcdram_per_mc=%d, mc_address=0x%lx\n", address, _mcdram_per_mc, mc_address);
 	Address tag = address / (_granularity / 64);
+	//info("!!!!!!!!!!!In DramCache tag is 0x%lx\n", tag);
 	uint64_t set_num = tag % _num_sets;
 	uint32_t hit_way = _num_ways;
 	//uint64_t orig_cycle = req.cycle;
@@ -252,6 +253,15 @@ MemoryController::access(MemReq& req)
 		if (_tlb[tag].way != _num_ways) {
 			hit_way = _tlb[tag].way;
 			assert(_cache[set_num].ways[hit_way].valid && _cache[set_num].ways[hit_way].tag == tag);
+
+#if 0
+	//print tlb
+	if(_tlb.find(tag) != _tlb.end())
+	{
+        info("In DramCache, DramCache hit, access address is 0x%lx, tag is 0x%lx", req.lineAddr, tag);
+	}
+
+#endif
 		} else if (_scheme != Tagless) {
 			// for Tagless, this assertion takes too much time.
 			for (uint32_t i = 0; i < _num_ways; i ++)
@@ -741,14 +751,6 @@ MemoryController::access(MemReq& req)
 		}
 	}
 
-#if 0
-	//print tlb
-	if(_tlb.find(tag) != _tlb.end())
-	{
-		info("MC cache hit ,address is 0x%lx , tag is 0x%lx, print tlb entry.tag:0x%lx : ", req.lineAddr, tag, (*(this->getTLB()))[tag].tag );
-	}
-
-#endif
 
  	futex_unlock(&_lock);
 	//uint64_t latency = req.cycle - orig_cycle;

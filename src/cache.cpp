@@ -31,7 +31,7 @@
 #include "timing_cache.h"
 #include "zsim.h"
 
-Cache::Cache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, const g_string& _name, std::string & _cacheType)
+Cache::Cache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, const g_string& _name, g_string & _cacheType)
     : cc(_cc), array(_array), rp(_rp), numLines(_numLines), accLat(_accLat), invLat(_invLat), name(_name), cacheType(_cacheType) {}
 
 const char* Cache::getName() {

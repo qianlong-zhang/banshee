@@ -69,7 +69,7 @@ class FilterCache : public Cache {
 		g_unordered_set <Address> _exist_pgnum;
     public:
         FilterCache(uint32_t _numSets, uint32_t _numLines, CC* _cc, CacheArray* _array,
-                ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, g_string& _name, Config &config,std::string _cacheType)
+                ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, g_string& _name, Config &config,g_string _cacheType)
             : Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name, _cacheType)
         {
             numSets = _numSets;

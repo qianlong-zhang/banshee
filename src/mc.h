@@ -137,6 +137,7 @@ public:
    	Set * getSets()         { return _cache; };
    	g_unordered_map<Address, TLBEntry> * getTLB() { return &_tlb; };
 	TagBuffer * getTagBuffer() { return _tag_buffer; };
+    double getRecentBWRatio() { return _mc_bw_per_step /(_mc_bw_per_step + _ext_bw_per_step); }
 
 	uint64_t getGranularity() { return _granularity; };
 

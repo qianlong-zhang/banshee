@@ -55,10 +55,10 @@ class Cache : public BaseCache {
         uint32_t invLat; //latency of an invalidation
 
         g_string name;
-        std::string cacheType;//TimingCache or regular Cache
+        g_string cacheType;//TimingCache or regular Cache
 
     public:
-        Cache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, const g_string& _name, std::string &_cacheType);
+        Cache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, const g_string& _name, g_string &_cacheType);
 
         const char* getName();
         void setParents(uint32_t _childId, const g_vector<MemObject*>& parents, Network* network);

@@ -54,6 +54,7 @@ int launchXtermDebugger(int targetPid, LibInfo* libzsimAddrs) {
             "-ex", "set confirm on", //reenable confirmations
             "-ex", "c", //start running
             nullptr};
+        //info("lanucn Xterm command: %s, %s", args[0], args);
         execvp(args[0], (char* const*)args);
         panic("shouldn't reach this...");
     } else {

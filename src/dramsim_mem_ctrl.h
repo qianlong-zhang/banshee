@@ -100,14 +100,14 @@ class SplitAddrMemory : public MemObject {
         uint64_t access(MemReq& req) {
             Address addr = req.lineAddr;
 			uint32_t mem = (addr / _mapping_granu) % mems.size();
-			trace(Mem, "MemReq address 0x%lx, addr/_mapping_granu=0x%lx, mem_ctrl name: %s", addr, addr/_mapping_granu, mems[mem]->getName());
+			//info("!!!!!!!!!MemReq address 0x%lx, mapping_granu:%d, laddr/_mapping_granu=0x%lx, mem_ctrl name: %s", addr, _mapping_granu, addr/_mapping_granu, mems[mem]->getName());
 			Address sel1 = addr / _mapping_granu / mems.size();
 			Address sel2 = addr % _mapping_granu;
 			req.lineAddr = sel1 * _mapping_granu + sel2;
             //uint32_t mem = addr % mems.size();
             //Address ctrlAddr = addr/mems.size();
             //req.lineAddr = ctrlAddr;
-			trace(Mem, "MemReq address after round:0x%lx", req.lineAddr);
+            //info("!!!!!!!!!sel1 = 0x%lx, sel2=0x%lx, memReq address=0x%lx, memContrl:%d", sel1, sel2, req.lineAddr, mem);
             uint64_t respCycle = mems[mem]->access(req);
             req.lineAddr = addr;
             return respCycle;

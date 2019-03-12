@@ -93,6 +93,10 @@ void getLibzsimAddrs(LibInfo* libzsimAddrs) {
 
 
 void notifyHarnessForDebugger(int harnessPid) {
+    info("in %s, send signal to %d", __func__, harnessPid);
+    //sleep(100);
     kill(harnessPid, SIGUSR1);
+    info("in %s", __func__);
     sleep(1); //this is a bit of a hack, but ensures the debugger catches us
+    info("in %s", __func__);
 }

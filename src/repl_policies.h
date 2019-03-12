@@ -52,6 +52,7 @@ class ReplPolicy : public GlobAlloc {
 
         virtual uint32_t rankCands(const MemReq* req, SetAssocCands cands) = 0;
         virtual uint32_t rankCands(const MemReq* req, ZCands cands) = 0;
+        virtual bool isLRUDC(){ return false;}
 
         virtual void initStats(AggregateStat* parent) {}
 };
@@ -110,7 +111,7 @@ class LRUReplPolicy : public ReplPolicy {
             gm_free(array);
         }
 
-        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) {
             array[id] = timestamp++;
         }
 
@@ -146,6 +147,7 @@ template <bool sharersAware>
 class LRUDCReplPolicy : public ReplPolicy {
     protected:
         uint64_t timestamp; // incremented on each access
+        uint64_t replLines4DC; // count the situation where return lines hit in DC not pure LRU lines
 		struct _array{
 			uint64_t count;
 			bool in_dram_cache;
@@ -155,16 +157,20 @@ class LRUDCReplPolicy : public ReplPolicy {
     public:
         explicit LRUDCReplPolicy(uint32_t _numLines) : timestamp(1), numLines(_numLines) {
             array = gm_calloc<class _array>(numLines);
+            replLines4DC = 0;
         }
 
         ~LRUDCReplPolicy() {
             gm_free(array);
         }
+        uint64_t getReplLinesDC() { return replLines4DC; }
 
-        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) {
             array[id].count = timestamp++;
 			array[id].in_dram_cache = hit_in_dc;
         }
+
+        bool isLRUDC(){ return true;}
 
         void replaced(uint32_t id) {
             array[id].count = 0;
@@ -179,7 +185,8 @@ class LRUDCReplPolicy : public ReplPolicy {
 			bool hit_dram_cache = false;
 			C temp_cands = cands;
 
-			//cachelines hit in dram cache should be replaced first
+			//cachelines hit in dram cache(DC) should be replaced first
+            //but replaced lines maybe very hot than lines not hit in DC
             for (auto ci = temp_cands.begin(); ci != temp_cands.end(); ci.inc()) {
 				if (array[*ci].in_dram_cache == true)
 				{
@@ -197,6 +204,7 @@ class LRUDCReplPolicy : public ReplPolicy {
                 secondCand = (s < secondScore)? *ci : secondCand;
                 secondScore = MIN(s, secondScore);
             }
+            if (bestCand != secondCand) replLines4DC++;
 			if(hit_dram_cache)
 				return bestCand;
 			else
@@ -289,7 +297,7 @@ class NRUReplPolicy : public LegacyReplPolicy {
             gm_free(candArray);
         }
 
-        void update(uint32_t id, const MemReq* req, bool hit_in_dc ) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) {
             //if (array[id]) info("update PRE %d %d %d", id, array[id], youngLines);
             youngLines += 1 - (array[id] >> 1); //+0 if young, +1 if old
             array[id] |= 0x2;
@@ -346,7 +354,7 @@ class RandReplPolicy : public LegacyReplPolicy {
             gm_free(candArray);
         }
 
-        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {}
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) {}
 
         void recordCandidate(uint32_t id) {
             candArray[candIdx++] = id;
@@ -419,7 +427,7 @@ class LFUReplPolicy : public LegacyReplPolicy {
             gm_free(array);
         }
 
-        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) {
             //ts is the "center of mass" of all the accesses, i.e. the average timestamp
             array[id].ts = (array[id].acc*array[id].ts + timestamp)/(array[id].acc + 1);
             array[id].acc++;
@@ -493,7 +501,7 @@ class ProfViolReplPolicy : public T {
             parentStat->append(&profNoViolEv);
         }
 
-        void update(uint32_t id, const MemReq* req, bool hit_in_dc) {
+        void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) {
             T::update(id, req, hit_in_dc);
 
             bool read = (req->type == GETS);

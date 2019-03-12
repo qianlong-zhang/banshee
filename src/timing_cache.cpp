@@ -28,6 +28,7 @@
 #include "timing_event.h"
 #include "zsim.h"
 #include "dramsim_mem_ctrl.h"
+#include "config.h"
 
 // Events
 class HitEvent : public TimingEvent {
@@ -79,7 +80,7 @@ class ReplAccessEvent : public TimingEvent {
         void simulate(uint64_t startCycle) {cache->simulateReplAccess(this, startCycle);}
 };
 
-TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t _tagLat, uint32_t _ways, uint32_t _cands, uint32_t _domain, const g_string& _name, std::string & _replType, std::string & _cacheType)
+TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t _tagLat, uint32_t _ways, uint32_t _cands, uint32_t _domain, const g_string& _name, g_string & _replType, g_string & _cacheType)
     : Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name, _cacheType), numMSHRs(mshrs), tagLat(_tagLat), ways(_ways), cands(_cands)
 {
     lastFreeCycle = 0;
@@ -88,7 +89,7 @@ TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPo
     activeMisses = 0;
     domain = _domain;
 	repl_type = _replType;
-    info("%s: mshrs %d domain %d, replType = %s cacheType:%s ,this pointer is %p", name.c_str(), numMSHRs, domain, repl_type.c_str(),_cacheType.c_str(), this);
+    //info("%s: mshrs %d domain %d, replType = %s cacheType:%s ,this pointer is %p", name.c_str(), numMSHRs, domain, repl_type.c_str(),_cacheType.c_str(), this);
 }
 
 void TimingCache::initStats(AggregateStat* parentStat) {
@@ -103,10 +104,12 @@ void TimingCache::initStats(AggregateStat* parentStat) {
     profHitLat.init("latHit", "Cumulative latency accesses that hit (demand and non-demand)");
     profMissRespLat.init("latMissResp", "Cumulative latency for miss start to response");
     profMissLat.init("latMiss", "Cumulative latency for miss start to finish (free MSHR)");
+    profDramCacheHit.init("DramCacheHit", "Cumulative counts we knows before access Dram Cache");
 
     cacheStat->append(&profHitLat);
     cacheStat->append(&profMissRespLat);
     cacheStat->append(&profMissLat);
+    cacheStat->append(&profDramCacheHit);
 
     parentStat->append(cacheStat);
 }
@@ -123,8 +126,10 @@ uint64_t TimingCache::access(MemReq& req) {
 
     uint64_t respCycle = req.cycle;
     bool skipAccess = cc->startAccess(req); //may need to skip access due to races (NOTE: may change req.type!)
+    Address DramCacheAddr=0;
     if (likely(!skipAccess)) {
         bool dram_cache_hit=false;
+        double mcBwRatio = -1.0;
         //info("this cache is %s, this->getReplName() is %s ", this->getName(), this->getReplName().c_str() );
 #if 1
         //assert this cache is timing cache, because we assume TLB only exist in LLC timing cache
@@ -134,31 +139,62 @@ uint64_t TimingCache::access(MemReq& req) {
             //info("this pointer is %p, cache_name is %s, is llc? %s, dram cache granu is %d", this, this->getName().c_str(), this->if_is_llc()?"True":"false", this->get_dram_cache_granu());
 #if 1
             assert(this->getDCGranu() != 0);
-            Address	temp_tag = req.lineAddr / (this->getDCGranu() / 64);
-            //info("In llc, access address is 0x%lx, tag is 0x%lx", req.lineAddr, temp_tag);
             g_unordered_map <Address, TLBEntry>* temp_tlb;
             MemObject* temp_mems = this->getMems();
-            if( this->getMemCtrls()>1 )
-            {
-                for(uint32_t i=0; i<this->getMemCtrls(); i++)
-                {
-                    //info("mems %d pointer is %p", i, (*temp_mems)[i]);
-                    SplitAddrMemory *temp_split = dynamic_cast<SplitAddrMemory*>(temp_mems);
-                    const g_vector<MemObject*>* temp_mems = temp_split->getMems();
+			uint32_t memCtrls = this->getMemCtrls();
+			uint32_t _mapping_granu = this->getMappingGranu();
+            if( memCtrls >1 )
+			{
+				//Those codes are from SplitAddrMemory::access();
+				Address addr = req.lineAddr;
+                //info("+++++++++++++++req.lineAddr is 0x%lx, mapping_granu:%d, addr/mapping_granu:0x%lx, memctrls:%d", addr, _mapping_granu, addr/_mapping_granu, memCtrls);
+                uint32_t mem = (addr / _mapping_granu) % memCtrls;
+				Address sel1 = addr / _mapping_granu / memCtrls;
+				Address sel2 = addr % _mapping_granu;
+				DramCacheAddr = sel1 * _mapping_granu + sel2;
+                //info("+++++++++++++++sel1 = 0x%lx, sel2=0x%lx, DramCacheAddr=0x%lx, memContrl:%d", sel1, sel2, DramCacheAddr, mem);
 
-                    temp_tlb  = dynamic_cast<MemoryController*>((*temp_mems)[i])->getTLB();
-                    //info("temp_tlb is %p", temp_tlb);
-                    if(temp_tlb != NULL && temp_tlb->find(temp_tag) != temp_tlb->end())
-                       dram_cache_hit = true;
+                //Address mc_address = (DramCacheAddr / 64 / this->getMcdramPerMc()*64) | (addr % 64);
+
+                Address	temp_tag = DramCacheAddr / (this->getCacheGranu() / 64);
+				//info("+++++++++++++++In LLC, access address is 0x%lx, DramCacheAddr is 0x%lx, mc_address is 0x%lx, tag is 0x%lx", req.lineAddr, DramCacheAddr, mc_address, temp_tag);
+
+                SplitAddrMemory *temp_split = dynamic_cast<SplitAddrMemory*>(temp_mems);
+                const g_vector<MemObject*>* temp_mems = temp_split->getMems();
+
+                temp_tlb  = dynamic_cast<MemoryController*>((*temp_mems)[mem])->getTLB();
+                //info("temp_tlb is %p", temp_tlb);
+                if(temp_tlb != NULL && temp_tlb->find(temp_tag) != temp_tlb->end())
+                {
+                    dram_cache_hit = true;
+                    mcBwRatio = dynamic_cast<MemoryController*>((*temp_mems)[mem])->getRecentBWRatio();
+                    //info("HBM bandwidth with ratio is %lf", mcBwRatio);
+                    profDramCacheHit.inc();
+                    //info("In LLC, DramCache Hit, access address is 0x%lx, tag is 0x%lx", DramCacheAddr, temp_tag);
                 }
             }
             else
             {
                 temp_tlb  = dynamic_cast<MemoryController*>(temp_mems)->getTLB();
                 //info("temp_tlb is %p", temp_tlb);
+                Address	temp_tag = req.lineAddr / (_mapping_granu / 64);
                 if(temp_tlb != NULL && temp_tlb->find(temp_tag) != temp_tlb->end())
+                {
                    dram_cache_hit = true;
+                   profDramCacheHit.inc();
+                   mcBwRatio = dynamic_cast<MemoryController*>(temp_mems)->getRecentBWRatio();
+                   //info("HBM bandwidth with ratio is %lf", mcBwRatio);
+                   //info("In LLC, DramCache Hit, access address is 0x%lx, tag is 0x%lx", req.lineAddr, temp_tag);
+                }
 
+            }
+            //walk through same set in req.lineAddr to
+            //self writeback dirty cachelines
+            if(this->getSelfWriteBack() && (mcBwRatio > 0.5))
+            {
+                //if current req is llc hit, self wirteback one cacheline
+                //enable cache self writeback
+                //info("HBM bandwidth with ratio is %lf", mcBwRatio);
             }
 #endif
 
@@ -207,6 +243,8 @@ uint64_t TimingCache::access(MemReq& req) {
 
             // Miss events:
             // MissStart (does high-prio lookup) -> getEvent || evictionEvent || replEvent (if needed) -> MissWriteback
+            //if(DramCacheAddr != 0)
+                //info("LLC miss, access address is 0x%lx", DramCacheAddr);
 
             MissStartEvent* mse = new (evRec) MissStartEvent(this, accLat, domain);
             MissResponseEvent* mre = new (evRec) MissResponseEvent(this, mse, domain);

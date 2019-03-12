@@ -269,15 +269,17 @@ void ContentionSim::simThreadLoop(uint32_t thid) {
     assert_msg(r == 0, "sched_setaffinity failed (%d)", r);
 #endif
     while (true) {
+        //info("--- phase start");
         futex_lock_nospin(&simThreads[thid].wakeLock);
+        //info("--- phase start");
 
         if (terminate) {
             break;
         }
 
-        //info("%d --- phase start", domain);
+        //info("--- phase start");
         simulatePhaseThread(thid);
-        //info("%d --- phase end", domain);
+        //info("--- phase end");
 
         uint32_t val = __sync_add_and_fetch(&threadsDone, 1);
         if (val == numSimThreads) {
@@ -285,13 +287,13 @@ void ContentionSim::simThreadLoop(uint32_t thid) {
             futex_unlock(&waitLock); //unblock caller
         }
     }
-    info("Finished contention simulation thread %d", thid);
+    //info("Finished contention simulation thread %d", thid);
 }
 
 void ContentionSim::simulatePhaseThread(uint32_t thid) {
     uint32_t thDomains = simThreads[thid].supDomain - simThreads[thid].firstDomain;
     uint32_t numFinished = 0;
-	//printf("thDomains = %d\n", thDomains);
+	//info("thDomains = %d\n", thDomains);
     if (thDomains == 1) {
         DomainData& domain = domains[simThreads[thid].firstDomain];
         domain.profTime.start();
@@ -300,7 +302,7 @@ void ContentionSim::simulatePhaseThread(uint32_t thid) {
             uint64_t domCycle = domain.curCycle;
             uint64_t cycle;
             TimingEvent* te = pq.dequeue(cycle);
-			//printf("cycle=%ld, domain=%d, numChild=%d, preDelay=%d, postDelay=%d, minStart=%ld\n",
+			//info("cycle=%ld, domain=%d, numChild=%d, preDelay=%d, postDelay=%d, minStart=%ld\n",
 			//	cycle, te->getDomain(), te->getNumChildren(), te->getPreDelay(), te->getPostDelay(),
 			//	te->getMinStartCycle());
             assert(cycle >= domCycle);
@@ -341,7 +343,7 @@ void ContentionSim::simulatePhaseThread(uint32_t thid) {
                     uniqueEvs++;
                     desc = ss.str();
                 }
-                info("[%d] %ld %s", thid, cycle, desc.c_str());
+                //info("[%d] %ld %s", thid, cycle, desc.c_str());
             }
             futex_unlock(&postMortemLock);
         }

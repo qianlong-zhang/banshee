@@ -95,8 +95,9 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
 
 	//make sure only Timing cache can have tlb in LLC
 	bool enable_tlb_llc = config.get<bool>(prefix + "enable_tlb_llc", false);
+	bool enable_self_writeback = config.get<bool>(prefix + "self_writeback", false);
 	string temp_type = "Timing";
-	if (enable_tlb_llc)
+	if (enable_tlb_llc || enable_self_writeback)
 		assert(temp_type == type);
 
     uint32_t lineSize = zinfo->lineSize;
@@ -284,21 +285,28 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         cc = new MESICC(numLines, nonInclusiveHack, name);
     }
     rp->setCC(cc);
+    g_string g_type(type.c_str());//convert string to g_string
+    g_string g_replType(replType.c_str());//convert string to g_string
     if (!isTerminal) {
         if (type == "Simple") {
-            cache = new Cache(numLines, cc, array, rp, accLat, invLat, name, type);
+            cache = new Cache(numLines, cc, array, rp, accLat, invLat, name, g_type);
         } else if (type == "Timing") {
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
             uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
 			uint32_t dram_cache_granularity = config.get<uint32_t>("sys.mem.mcdram.cache_granularity");
 			//info(" dram_cache_granularity is %d", dram_cache_granularity);
-            cache = new TimingCache(numLines, cc, array, rp, accLat, invLat, mshrs, tagLat, ways, timingCandidates, domain, name, replType, type);
+            cache = new TimingCache(numLines, cc, array, rp, accLat, invLat, mshrs, tagLat, ways, timingCandidates, domain, name, g_replType, g_type);
 			dynamic_cast<TimingCache*>(cache)->setDCGranu(dram_cache_granularity);
+			dynamic_cast<TimingCache*>(cache)->setMappingGranu(config.get<uint32_t>("sys.mem.mapGranu", 64));
+			dynamic_cast<TimingCache*>(cache)->setMcdramPerMc(config.get<uint32_t>("sys.mem.mcdram.mcdramPerMC", 4));
+			dynamic_cast<TimingCache*>(cache)->setCacheGranu(config.get<uint32_t>("sys.mem.mcdram.cache_granularity"));
+			dynamic_cast<TimingCache*>(cache)->setSelfWriteBack(enable_self_writeback);
+
         } else if (type == "Tracing") {
             g_string traceFile = config.get<const char*>(prefix + "traceFile","");
             if (traceFile.empty()) traceFile = g_string(zinfo->outputDir) + "/" + name + ".trace";
-            cache = new TracingCache(numLines, cc, array, rp, accLat, invLat, traceFile, name, type);
+            cache = new TracingCache(numLines, cc, array, rp, accLat, invLat, traceFile, name, g_type);
         } else {
             panic("Invalid cache type %s", type.c_str());
         }
@@ -306,7 +314,7 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
         //Filter cache optimization
         if (type != "Simple") panic("Terminal cache %s can only have type == Simple", name.c_str());
         if (arrayType != "SetAssoc" || hashType != "None" || replType != "LRU") panic("Invalid FilterCache config %s", name.c_str());
-        cache = new FilterCache(numSets, numLines, cc, array, rp, accLat, invLat, name, config, type);
+        cache = new FilterCache(numSets, numLines, cc, array, rp, accLat, invLat, name, config, g_type);
     }
 
 #if 0
@@ -641,14 +649,14 @@ static void InitSystem(Config& config) {
                 if( bank_name.find("l1") == std::string::npos && dynamic_cast<Cache *>(bank)->isTimingCache())
                 {
                     TimingCache *temp_bank =  dynamic_cast<TimingCache *>(bank);
-                    info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
+                    //info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
                     if( temp_bank->DramCacheAware())
                     {
-                        info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
+                        //info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
                         temp_bank->setMems(mems[0]);
                         temp_bank->setMemCtrls(memControllers);
                         temp_bank->setMemCtrls(memControllers);
-                        info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
+                        //info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
                     }
                 }
             }
@@ -930,9 +938,12 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
     zinfo->harnessPid = getppid();
     getLibzsimAddrs(&zinfo->libzsimAddrs);
 
+    info("In %s", __func__);
     if (zinfo->attachDebugger) {
         gm_set_secondary_ptr(&zinfo->libzsimAddrs);
+        info("In %s, my pid is %d , harness id is %d", __func__, getpid(), zinfo->harnessPid);
         notifyHarnessForDebugger(zinfo->harnessPid);
+        info("In %s", __func__);
     }
 
     PreInitStats();

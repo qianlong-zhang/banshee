@@ -42,6 +42,8 @@ int32_t SetAssocArray::lookup(const Address lineAddr, const MemReq* req, bool up
     for (uint32_t id = first; id < first + assoc; id++) {
         if (array[id] ==  lineAddr) {
             if (updateReplacement) rp->update(id, req, hit_in_dc);
+			if (rp->isLRUDC())
+				RepLines4DC.inc(dynamic_cast<LRUDCReplPolicy<true> *>(rp)->getReplLinesDC());
             return id;
         }
     }
@@ -62,6 +64,14 @@ void SetAssocArray::postinsert(const Address lineAddr, const MemReq* req, uint32
     rp->replaced(candidate);
     array[candidate] = lineAddr;
     rp->update(candidate, req, hit_in_dc);
+}
+
+void SetAssocArray::initStats(AggregateStat* parentStat) {
+    AggregateStat* objStats = new AggregateStat();
+    objStats->init("array", "SetAssocArray stats");
+    RepLines4DC.init("RepLines4DC", "Culmulate the situation where return lines hit in DC not pure LRU lines");
+    objStats->append(&RepLines4DC);
+    parentStat->append(objStats);
 }
 
 
