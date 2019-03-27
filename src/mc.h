@@ -132,12 +132,19 @@ public:
 	uint64_t getNumRequests() { return _num_requests; };
    	uint64_t getNumSets()     { return _num_sets; };
    	uint32_t getNumWays()     { return _num_ways; };
-   	double getRecentMissRate(){ return (double) _num_miss_per_step / (_num_miss_per_step + _num_hit_per_step); };
+   	double getRecentMissRate(){
+        return ((double) _num_miss_per_step / (_num_miss_per_step + _num_hit_per_step));
+    };
    	Scheme getScheme()      { return _scheme; };
    	Set * getSets()         { return _cache; };
    	g_unordered_map<Address, TLBEntry> * getTLB() { return &_tlb; };
 	TagBuffer * getTagBuffer() { return _tag_buffer; };
-    double getRecentBWRatio() { return _mc_bw_per_step /(_mc_bw_per_step + _ext_bw_per_step); }
+    double getRecentBWRatio() {
+        if(_mc_bw_per_step + _ext_bw_per_step > 0)
+            return (1.0 * _mc_bw_per_step / (_mc_bw_per_step + _ext_bw_per_step));
+        else
+            return 0.0000001;
+    }
 
 	uint64_t getGranularity() { return _granularity; };
 
@@ -198,6 +205,10 @@ private:
 	// For UnisonCache
 	Counter _numTouchedLines;
 	Counter _numEvictedLines;
+
+    // For HybridCache
+	Counter _numNotTouchedLines;
+	Counter _numTouchedPages;
 
 	uint64_t _num_hit_per_step;
    	uint64_t _num_miss_per_step;

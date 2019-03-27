@@ -294,14 +294,14 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             uint32_t mshrs = config.get<uint32_t>(prefix + "mshrs", 16);
             uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
-			uint32_t dram_cache_granularity = config.get<uint32_t>("sys.mem.mcdram.cache_granularity");
-			//info(" dram_cache_granularity is %d", dram_cache_granularity);
             cache = new TimingCache(numLines, cc, array, rp, accLat, invLat, mshrs, tagLat, ways, timingCandidates, domain, name, g_replType, g_type);
-			dynamic_cast<TimingCache*>(cache)->setDCGranu(dram_cache_granularity);
-			dynamic_cast<TimingCache*>(cache)->setMappingGranu(config.get<uint32_t>("sys.mem.mapGranu", 64));
-			dynamic_cast<TimingCache*>(cache)->setMcdramPerMc(config.get<uint32_t>("sys.mem.mcdram.mcdramPerMC", 4));
-			dynamic_cast<TimingCache*>(cache)->setCacheGranu(config.get<uint32_t>("sys.mem.mcdram.cache_granularity"));
-			dynamic_cast<TimingCache*>(cache)->setSelfWriteBack(enable_self_writeback);
+            if( g_replType == "LRU_DC"){
+                dynamic_cast<TimingCache*>(cache)->setDCGranu(config.get<uint32_t>("sys.mem.mcdram.cache_granularity"));
+                dynamic_cast<TimingCache*>(cache)->setMappingGranu(config.get<uint32_t>("sys.mem.mapGranu", 64));
+                dynamic_cast<TimingCache*>(cache)->setMcdramPerMc(config.get<uint32_t>("sys.mem.mcdram.mcdramPerMC", 4));
+                dynamic_cast<TimingCache*>(cache)->setCacheGranu(config.get<uint32_t>("sys.mem.mcdram.cache_granularity"));
+                dynamic_cast<TimingCache*>(cache)->setSelfWriteBack(enable_self_writeback);
+            }
 
         } else if (type == "Tracing") {
             g_string traceFile = config.get<const char*>(prefix + "traceFile","");
@@ -654,7 +654,6 @@ static void InitSystem(Config& config) {
                     {
                         //info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
                         temp_bank->setMems(mems[0]);
-                        temp_bank->setMemCtrls(memControllers);
                         temp_bank->setMemCtrls(memControllers);
                         //info("setTLB for %s, line = %d", bank_name.c_str(), __LINE__);
                     }

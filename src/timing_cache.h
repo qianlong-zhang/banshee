@@ -65,6 +65,7 @@ class TimingCache : public Cache {
 
         uint32_t dram_cache_granularity;
         uint32_t memControllers;
+        double dynamic_repl_rate;
 
     public:
         TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, uint32_t mshrs, uint32_t tagLat, uint32_t ways, uint32_t cands, uint32_t _domain, const g_string& _name, g_string &replType, g_string &_cacheType);
@@ -100,7 +101,7 @@ class TimingCache : public Cache {
         };
         uint32_t getCacheGranu(){ return _granularity;};
         void setSelfWriteBack( bool self_wb) { enable_selfWB = self_wb; }
-        bool getSelfWriteBack() { return enable_selfWB; }
+        bool isSelfWriteBack() { return enable_selfWB; }
 
         //void setReplName(g_string name) {  repl_type = name;} ;
         void setMemCtrls(uint32_t mem_ctrls) {  memControllers = mem_ctrls;} ;

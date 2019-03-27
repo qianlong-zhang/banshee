@@ -36,17 +36,17 @@
 class CacheArray : public GlobAlloc {
     public:
         /* Returns tag's ID if present, -1 otherwise. If updateReplacement is set, call the replacement policy's update() on the line accessed*/
-        virtual int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc) = 0 ;
+        virtual int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc=false) = 0 ;
 
         /* Runs replacement scheme, returns tag ID of new pos and address of line to write back*/
-        virtual uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr) = 0;
+        virtual uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr, bool dynamic_repl=false) = 0;
 
         /* Actually do the replacement, writing the new address in lineId.
          * NOTE: This method is guaranteed to be called after preinsert, although
          * there may be some intervening calls to lookup. The implementation is
          * allowed to keep internal state in preinsert() and use it in postinsert()
          */
-        virtual void postinsert(const Address lineAddr, const MemReq* req, uint32_t lineId, bool hit_in_dc) = 0;
+        virtual void postinsert(const Address lineAddr, const MemReq* req, uint32_t lineId, bool hit_in_dc=false) = 0;
 
         virtual void initStats(AggregateStat* parent) {}
 };
@@ -69,9 +69,9 @@ class SetAssocArray : public CacheArray {
     public:
         SetAssocArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _rp, HashFamily* _hf);
 
-        int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc);
-        uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr);
-        void postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate, bool hit_in_dc);
+        int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc=false);
+        uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr ,bool dynamic_repl=false);
+        void postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate, bool hit_in_dc=false);
         void initStats(AggregateStat* parentStat);
 };
 
@@ -100,8 +100,8 @@ class ZArray : public CacheArray {
         ZArray(uint32_t _numLines, uint32_t _ways, uint32_t _candidates, ReplPolicy* _rp, HashFamily* _hf);
 
         int32_t lookup(const Address lineAddr, const MemReq* req, bool updateReplacement, bool hit_in_dc = false);
-        uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr);
-        void postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate, bool hit_in_dc);
+        uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr, bool dynamic_repl=false);
+        void postinsert(const Address lineAddr, const MemReq* req, uint32_t candidate, bool hit_in_dc=false);
 
         //zcache-specific, since timing code needs to know the number of swaps, and these depend on idx
         //Should be called after preinsert(). Allows intervening lookups
