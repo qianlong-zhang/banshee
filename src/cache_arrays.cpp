@@ -42,19 +42,20 @@ int32_t SetAssocArray::lookup(const Address lineAddr, const MemReq* req, bool up
     for (uint32_t id = first; id < first + assoc; id++) {
         if (array[id] ==  lineAddr) {
             if (updateReplacement) rp->update(id, req, hit_in_dc);
-			if (rp->isLRUDC())
-				RepLines4DC.inc(dynamic_cast<LRUDCReplPolicy<true> *>(rp)->getReplLinesDC());
+			if (rp->isDCAware())
+				RepLines4DC.set(dynamic_cast<LRUDCReplPolicy<true> *>(rp)->getReplLinesDC());
             return id;
         }
     }
     return -1;
 }
 
-uint32_t SetAssocArray::preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr) { //TODO: Give out valid bit of wb cand?
+uint32_t SetAssocArray::preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr, bool dynamic_repl) { //TODO: Give out valid bit of wb cand?
     uint32_t set = hf->hash(0, lineAddr) & setMask;
     uint32_t first = set*assoc;
 
-    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc));
+	//info("dynamic_repl = %s", dynamic_repl?"True":"False");
+    uint32_t candidate = rp->rankCands(req, SetAssocCands(first, first+assoc), dynamic_repl);
 
     *wbLineAddr = array[candidate];
     return candidate;
@@ -125,7 +126,7 @@ int32_t ZArray::lookup(const Address lineAddr, const MemReq* req, bool updateRep
     return -1;
 }
 
-uint32_t ZArray::preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr) {
+uint32_t ZArray::preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr, bool dynamic_repl) {
     ZWalkInfo candidates[cands + ways]; //extra ways entries to avoid checking on every expansion
 
     bool all_valid = true;
@@ -176,7 +177,7 @@ uint32_t ZArray::preinsert(const Address lineAddr, const MemReq* req, Address* w
 
     //info("Using %d candidates, all_valid=%d", numCandidates, all_valid);
 
-    uint32_t bestCandidate = rp->rankCands(req, ZCands(&candidates[0], &candidates[numCandidates]));
+    uint32_t bestCandidate = rp->rankCands(req, ZCands(&candidates[0], &candidates[numCandidates]), dynamic_repl);
     assert(bestCandidate < numLines);
 
     //Fill in swap array

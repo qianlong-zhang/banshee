@@ -50,9 +50,9 @@ class ReplPolicy : public GlobAlloc {
         virtual void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) = 0;
         virtual void replaced(uint32_t id) = 0;
 
-        virtual uint32_t rankCands(const MemReq* req, SetAssocCands cands) = 0;
-        virtual uint32_t rankCands(const MemReq* req, ZCands cands) = 0;
-        virtual bool isLRUDC(){ return false;}
+        virtual uint32_t rankCands(const MemReq* req, SetAssocCands cands, bool dynamic_repl) = 0;
+        virtual uint32_t rankCands(const MemReq* req, ZCands cands, bool dynamic_repl) = 0;
+        virtual bool isDCAware(){ return false;}
 
         virtual void initStats(AggregateStat* parent) {}
 };
@@ -62,7 +62,7 @@ class ReplPolicy : public GlobAlloc {
  * This way, we achieve a simple, single interface that is specialized transparently to each type of array
  * (this code is performance-critical)
  */
-#define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands) { return rank(req, cands); }
+#define DECL_RANK_BINDING(T) uint32_t rankCands(const MemReq* req, T cands, bool dynamic_repl) { return rank(req, cands, dynamic_repl); }
 #define DECL_RANK_BINDINGS DECL_RANK_BINDING(SetAssocCands); DECL_RANK_BINDING(ZCands);
 
 /* Legacy support.
@@ -81,7 +81,7 @@ class LegacyReplPolicy : public virtual ReplPolicy {
         virtual uint32_t getBestCandidate() = 0;
 
     public:
-        template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+        template <typename C> inline uint32_t rank(const MemReq* req, C cands, bool dynamic_repl) {
             startReplacement(req);
             for (auto ci = cands.begin(); ci != cands.end(); ci.inc()) {
                 recordCandidate(*ci);
@@ -119,7 +119,7 @@ class LRUReplPolicy : public ReplPolicy {
             array[id] = 0;
         }
 
-        template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+        template <typename C> inline uint32_t rank(const MemReq* req, C cands, bool dynamic_repl) {
             uint32_t bestCand = -1;
             uint64_t bestScore = (uint64_t)-1L;
             for (auto ci = cands.begin(); ci != cands.end(); ci.inc()) {
@@ -170,14 +170,14 @@ class LRUDCReplPolicy : public ReplPolicy {
 			array[id].in_dram_cache = hit_in_dc;
         }
 
-        bool isLRUDC(){ return true;}
+        bool isDCAware(){ return true;}
 
         void replaced(uint32_t id) {
             array[id].count = 0;
 			array[id].in_dram_cache = false;
         }
 
-        template <typename C> inline uint32_t rank(const MemReq* req, C cands) {
+        template <typename C> inline uint32_t rank(const MemReq* req, C cands, bool dynamic_repl) {
             uint32_t bestCand = -1;
             uint32_t secondCand = -1;
             uint64_t bestScore = (uint64_t)-1L;
@@ -205,8 +205,11 @@ class LRUDCReplPolicy : public ReplPolicy {
                 secondScore = MIN(s, secondScore);
             }
             if (bestCand != secondCand) replLines4DC++;
-			if(hit_dram_cache)
+            //info("dynamic_repl = %s", dynamic_repl?"True":"False");
+			if(hit_dram_cache && dynamic_repl){
+                //info("from LRUDCReplPolicy, returning bestCand");
 				return bestCand;
+            }
 			else
 				return secondCand;
         }

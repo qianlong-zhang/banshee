@@ -89,6 +89,14 @@ TimingCache::TimingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPo
     activeMisses = 0;
     domain = _domain;
 	repl_type = _replType;
+    dram_cache_granularity = 0;
+    _mapping_granu = 0;
+    _mcdram_per_mc = 0;
+    _granularity = 0;
+    enable_selfWB = false;
+    memControllers = 0;
+    mems = nullptr;
+    dynamic_repl_rate = 0.0;
     //info("%s: mshrs %d domain %d, replType = %s cacheType:%s ,this pointer is %p", name.c_str(), numMSHRs, domain, repl_type.c_str(),_cacheType.c_str(), this);
 }
 
@@ -129,47 +137,40 @@ uint64_t TimingCache::access(MemReq& req) {
     Address DramCacheAddr=0;
     if (likely(!skipAccess)) {
         bool dram_cache_hit=false;
+        bool dynamicRepl=false;
         double mcBwRatio = -1.0;
-        //info("this cache is %s, this->getReplName() is %s ", this->getName(), this->getReplName().c_str() );
 #if 1
         //assert this cache is timing cache, because we assume TLB only exist in LLC timing cache
         if(isTimingCache() && DramCacheAware())
         {
-            //info("this cache is %s", this->getName());
-            //info("this pointer is %p, cache_name is %s, is llc? %s, dram cache granu is %d", this, this->getName().c_str(), this->if_is_llc()?"True":"false", this->get_dram_cache_granu());
 #if 1
-            assert(this->getDCGranu() != 0);
+            assert(getDCGranu() != 0);
             g_unordered_map <Address, TLBEntry>* temp_tlb;
-            MemObject* temp_mems = this->getMems();
-			uint32_t memCtrls = this->getMemCtrls();
-			uint32_t _mapping_granu = this->getMappingGranu();
+            MemObject* temp_mems = getMems();
+            assert(temp_mems!=nullptr);
+			uint32_t memCtrls = getMemCtrls();
+			uint32_t _mapping_granu = getMappingGranu();
             if( memCtrls >1 )
 			{
 				//Those codes are from SplitAddrMemory::access();
 				Address addr = req.lineAddr;
-                //info("+++++++++++++++req.lineAddr is 0x%lx, mapping_granu:%d, addr/mapping_granu:0x%lx, memctrls:%d", addr, _mapping_granu, addr/_mapping_granu, memCtrls);
                 uint32_t mem = (addr / _mapping_granu) % memCtrls;
 				Address sel1 = addr / _mapping_granu / memCtrls;
 				Address sel2 = addr % _mapping_granu;
 				DramCacheAddr = sel1 * _mapping_granu + sel2;
-                //info("+++++++++++++++sel1 = 0x%lx, sel2=0x%lx, DramCacheAddr=0x%lx, memContrl:%d", sel1, sel2, DramCacheAddr, mem);
-
-                //Address mc_address = (DramCacheAddr / 64 / this->getMcdramPerMc()*64) | (addr % 64);
-
-                Address	temp_tag = DramCacheAddr / (this->getCacheGranu() / 64);
-				//info("+++++++++++++++In LLC, access address is 0x%lx, DramCacheAddr is 0x%lx, mc_address is 0x%lx, tag is 0x%lx", req.lineAddr, DramCacheAddr, mc_address, temp_tag);
+                Address	temp_tag = DramCacheAddr / (getCacheGranu() / 64);
 
                 SplitAddrMemory *temp_split = dynamic_cast<SplitAddrMemory*>(temp_mems);
-                const g_vector<MemObject*>* temp_mems = temp_split->getMems();
+                const g_vector<MemObject*>* temp_mem = temp_split->getMems();
 
-                temp_tlb  = dynamic_cast<MemoryController*>((*temp_mems)[mem])->getTLB();
+                temp_tlb  = dynamic_cast<MemoryController*>((*temp_mem)[mem])->getTLB();
                 //info("temp_tlb is %p", temp_tlb);
                 if(temp_tlb != NULL && temp_tlb->find(temp_tag) != temp_tlb->end())
                 {
                     dram_cache_hit = true;
-                    mcBwRatio = dynamic_cast<MemoryController*>((*temp_mems)[mem])->getRecentBWRatio();
-                    //info("HBM bandwidth with ratio is %lf", mcBwRatio);
+                    mcBwRatio = dynamic_cast<MemoryController*>((*temp_mem)[mem])->getRecentBWRatio();
                     profDramCacheHit.inc();
+                    //info("HBM bandwidth with ratio is %lf", mcBwRatio);
                     //info("In LLC, DramCache Hit, access address is 0x%lx, tag is 0x%lx", DramCacheAddr, temp_tag);
                 }
             }
@@ -188,14 +189,13 @@ uint64_t TimingCache::access(MemReq& req) {
                 }
 
             }
-            //walk through same set in req.lineAddr to
-            //self writeback dirty cachelines
-            if(this->getSelfWriteBack() && (mcBwRatio > 0.5))
+            if(mcBwRatio > 0.5)
             {
-                //if current req is llc hit, self wirteback one cacheline
-                //enable cache self writeback
+                dynamicRepl = true;
+                //this->setDynamicRepl(true);
                 //info("HBM bandwidth with ratio is %lf", mcBwRatio);
             }
+
 #endif
 
         }
@@ -210,8 +210,8 @@ uint64_t TimingCache::access(MemReq& req) {
 
             //Make space for new line
             Address wbLineAddr;
-            lineId = array->preinsert(req.lineAddr, &req, &wbLineAddr); //find the lineId to replace
-            trace(Cache, "MemReq address 0x%lx, [%s] Evicting 0x%lx",req.lineAddr,  name.c_str(), wbLineAddr);
+            lineId = array->preinsert(req.lineAddr, &req, &wbLineAddr, dynamicRepl); //find the lineId to replace
+            //info("MemReq address 0x%lx, [%s] Evicting 0x%lx",req.lineAddr,  name.c_str(), wbLineAddr);
 
             //Evictions are not in the critical path in any sane implementation -- we do not include their delays
             //NOTE: We might be "evicting" an invalid line for all we know. Coherence controllers will know what to do

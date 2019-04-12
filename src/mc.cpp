@@ -225,7 +225,7 @@ MemoryController::access(MemReq& req)
 	Address mc_address = (address / 64 / _mcdram_per_mc * 64) | (address % 64);
 	//info("!!!!!!!!!!!In DramCache, address=0x%lx, _mcdram_per_mc=%d, mc_address=0x%lx\n", address, _mcdram_per_mc, mc_address);
 	Address tag = address / (_granularity / 64);
-	//info("!!!!!!!!!!!In DramCache tag is 0x%lx\n", tag);
+	//info("!!!!!!!!!!!In DramCache address:0x%lx, tag: 0x%lx\n", address, tag);
 	uint64_t set_num = tag % _num_sets;
 	uint32_t hit_way = _num_ways;
 	//uint64_t orig_cycle = req.cycle;
@@ -248,8 +248,10 @@ MemoryController::access(MemReq& req)
 	// need to do so for LLC dirty eviction and if the page is not in TB
 	bool hybrid_tag_probe = false;
 	if (_granularity >= 4096) {
-		if (_tlb.find(tag) == _tlb.end())
+		if (_tlb.find(tag) == _tlb.end()){
          	_tlb[tag] = TLBEntry {tag, _num_ways, 0, 0, 0};
+            _numTouchedPages.inc();
+        }
 		if (_tlb[tag].way != _num_ways) {
 			hit_way = _tlb[tag].way;
 			assert(_cache[set_num].ways[hit_way].valid && _cache[set_num].ways[hit_way].tag == tag);
@@ -471,14 +473,16 @@ MemoryController::access(MemReq& req)
 
            		_tlb[replaced_tag].way = _num_ways;
 				// only used for UnisonCache
-				uint32_t unison_dirty_lines = __builtin_popcountll(_tlb[replaced_tag].dirty_bitvec) * 4;
-				uint32_t unison_touch_lines = __builtin_popcountll(_tlb[replaced_tag].touch_bitvec) * 4;
-				if (_scheme == UnisonCache || _scheme == Tagless) {
+				uint32_t unison_dirty_lines = __builtin_popcountll(_tlb[replaced_tag].dirty_bitvec) ;
+				uint32_t unison_touch_lines = __builtin_popcountll(_tlb[replaced_tag].touch_bitvec) ;
+				uint32_t untouch_lines = _granularity/64 - unison_touch_lines;
+				if (_scheme == UnisonCache || _scheme == Tagless || _scheme == HybridCache) {
 					assert(unison_touch_lines > 0);
 					assert(unison_touch_lines <= 64);
 					assert(unison_dirty_lines <= 64);
 					_numTouchedLines.inc(unison_touch_lines);
 					_numEvictedLines.inc(unison_dirty_lines);
+                    _numNotTouchedLines.inc(untouch_lines);
 				}
 
 				if (_cache[set_num].ways[replace_way].dirty) {
@@ -542,9 +546,9 @@ MemoryController::access(MemReq& req)
 			_cache[set_num].ways[replace_way].tag = tag;
          	_cache[set_num].ways[replace_way].dirty = (req.type == PUTX);
          	_tlb[tag].way = replace_way;
-			if (_scheme == UnisonCache || _scheme == Tagless) {
-				uint64_t bit = (address - tag * 64) / 4;
-				assert(bit < 16 && bit >= 0);
+			if (_scheme == UnisonCache || _scheme == Tagless || _scheme == HybridCache) {
+				uint64_t bit = (address - tag * 64) ;
+				assert(bit < 64 && bit >= 0);
 				bit = ((uint64_t)1UL) << bit;
 				_tlb[tag].touch_bitvec = 0;
 				_tlb[tag].dirty_bitvec = 0;
@@ -603,9 +607,16 @@ MemoryController::access(MemReq& req)
 				_mc_bw_per_step += 4;
 				req.lineAddr = address;
 				data_ready_cycle = req.cycle;
-				if (type == LOAD && _tag_buffer->canInsert(tag))
-					_tag_buffer->insert(tag, false);
-			} else {
+				if (type == LOAD && _tag_buffer->canInsert(tag)){
+					_tag_buffer->insert(tag, false);}
+
+                uint64_t bit = (address - tag * 64);
+                assert(bit < 64 && bit >= 0);
+                bit = ((uint64_t)1UL) << bit;
+                _tlb[tag].touch_bitvec |= bit;
+                if (type == STORE)
+                    _tlb[tag].dirty_bitvec |= bit;
+            } else {
 				assert(!_sram_tag);
 	            MemReq tag_probe = {mc_address, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
 				req.cycle = _mcdram[mcdram_select]->access(tag_probe, 0, 2);
@@ -616,6 +627,13 @@ MemoryController::access(MemReq& req)
 				_mc_bw_per_step += 4;
 				req.lineAddr = address;
 				data_ready_cycle = req.cycle;
+
+                uint64_t bit = (address - tag * 64);
+                assert(bit < 64 && bit >= 0);
+                bit = ((uint64_t)1UL) << bit;
+                _tlb[tag].touch_bitvec |= bit;
+                if (type == STORE)
+                    _tlb[tag].dirty_bitvec |= bit;
 			}
 		}
 		else if (_scheme == Tagless) {
@@ -625,8 +643,9 @@ MemoryController::access(MemReq& req)
 			req.lineAddr = address;
 			data_ready_cycle = req.cycle;
 
-			uint64_t bit = (address - tag * 64) / 4;
-			assert(bit < 16 && bit >= 0);
+			uint64_t bit = (address - tag * 64);
+            //info("Address:0x%lx, bit:%ld, tag:0x%lx, address-tag*64:%ld", address, bit, tag, address-tag*64);
+			assert(bit < 64 && bit >= 0);
 			bit = ((uint64_t)1UL) << bit;
 			_tlb[tag].touch_bitvec |= bit;
 			if (type == STORE)
@@ -647,8 +666,8 @@ MemoryController::access(MemReq& req)
 			_mcdram[mcdram_select]->access(tag_update_req, 2, 2);
 			_mc_bw_per_step += 2;
 			_numTagStore.inc();
-			uint64_t bit = (address - tag * 64) / 4;
-			assert(bit < 16 && bit >= 0);
+			uint64_t bit = (address - tag * 64);
+			assert(bit < 64 && bit >= 0);
 			bit = ((uint64_t)1UL) << bit;
 			_tlb[tag].touch_bitvec |= bit;
 			if (type == STORE)
@@ -809,6 +828,9 @@ MemoryController::initStats(AggregateStat* parentStat)
 
 	_numTouchedLines.init("totalTouchLines", "total # of touched lines in UnisonCache"); memStats->append(&_numTouchedLines);
 	_numEvictedLines.init("totalEvictLines", "total # of evicted lines in UnisonCache"); memStats->append(&_numEvictedLines);
+
+	_numTouchedPages.init("totalTouchedPages", "Number of pages touched"); memStats->append(&_numTouchedPages);
+	_numNotTouchedLines.init("totalNotTouchLines", "total # of never touched lines in HybridCache"); memStats->append(&_numNotTouchedLines);
 
 	_ext_dram->initStats(memStats);
 	for (uint32_t i = 0; i < _mcdram_per_mc; i++)

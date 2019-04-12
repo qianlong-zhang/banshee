@@ -49,7 +49,7 @@ class IdealLRUArray : public CacheArray {
 
                 void update(uint32_t id, const MemReq* req, bool hit_in_dc=false) {panic("!")}
                 void replaced(uint32_t id) {panic("!!");}
-                template <typename C> uint32_t rank(const MemReq* req, C cands) {panic("!!!");}
+                template <typename C> uint32_t rank(const MemReq* req, C cands, bool dynamic_repl) {panic("!!!");}
                 void initStats(AggregateStat* parent) {}
                 DECL_RANK_BINDINGS
         };
@@ -90,7 +90,7 @@ class IdealLRUArray : public CacheArray {
             return lineId;
         }
 
-        uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr) {
+        uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr,  bool dynamic_repl) {
             Entry* e = lruList.back();
             *wbLineAddr = e->lineAddr;
             return e->lineId;
@@ -235,7 +235,7 @@ class IdealLRUPartReplPolicy : public PartReplPolicy {
             return partInfo[victimPart].lruList.back()->lineId;
         }
 
-        template <typename C> uint32_t rank(const MemReq* req, C cands) {panic("!!");}
+        template <typename C> uint32_t rank(const MemReq* req, C cands, bool dynamic_repl) {panic("!!");}
         DECL_RANK_BINDINGS;
 };
 
@@ -262,7 +262,7 @@ class IdealLRUPartArray : public CacheArray {
             return lineId;
         }
 
-        uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr) {
+        uint32_t preinsert(const Address lineAddr, const MemReq* req, Address* wbLineAddr,  bool dynamic_repl) {
             uint32_t lineId = rp->rank(req);
             *wbLineAddr = lineAddrs[lineId];
             return lineId;
