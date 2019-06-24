@@ -334,6 +334,7 @@ MemoryController::access(MemReq& req)
 	// use the following state for requests, so that req.state is not changed
 	if (!cache_hit)
 	{
+        //printf("Cache miss: 0x%lx\n", address);
 		uint64_t cur_cycle = req.cycle;
 		_num_miss_per_step ++;
 		if (type == LOAD)
@@ -450,6 +451,7 @@ MemoryController::access(MemReq& req)
 			_numPlacement.inc();
          	if (_cache[set_num].ways[replace_way].valid)
 			{
+                _numEvictedValidPages.inc();
 				Address replaced_tag = _cache[set_num].ways[replace_way].tag;
 				// Note that tag_buffer is not updated if placed into an invalid entry.
 				// this is like ignoring the initialization cost
@@ -472,17 +474,15 @@ MemoryController::access(MemReq& req)
 				}
 
            		_tlb[replaced_tag].way = _num_ways;
-				// only used for UnisonCache
+				// only used for Unison/Tagless/Hybrid Cache
 				uint32_t unison_dirty_lines = __builtin_popcountll(_tlb[replaced_tag].dirty_bitvec) ;
 				uint32_t unison_touch_lines = __builtin_popcountll(_tlb[replaced_tag].touch_bitvec) ;
-				uint32_t untouch_lines = _granularity/64 - unison_touch_lines;
 				if (_scheme == UnisonCache || _scheme == Tagless || _scheme == HybridCache) {
 					assert(unison_touch_lines > 0);
 					assert(unison_touch_lines <= 64);
 					assert(unison_dirty_lines <= 64);
 					_numTouchedLines.inc(unison_touch_lines);
 					_numEvictedLines.inc(unison_dirty_lines);
-                    _numNotTouchedLines.inc(untouch_lines);
 				}
 
 				if (_cache[set_num].ways[replace_way].dirty) {
@@ -548,8 +548,10 @@ MemoryController::access(MemReq& req)
          	_tlb[tag].way = replace_way;
 			if (_scheme == UnisonCache || _scheme == Tagless || _scheme == HybridCache) {
 				uint64_t bit = (address - tag * 64) ;
+                //printf("address: 0x%lx, tag:0x%lx, bit:x%ld\n", address, tag, bit);
 				assert(bit < 64 && bit >= 0);
 				bit = ((uint64_t)1UL) << bit;
+                //printf("bit:0x%lx\n", bit);
 				_tlb[tag].touch_bitvec = 0;
 				_tlb[tag].dirty_bitvec = 0;
 				_tlb[tag].touch_bitvec |= bit;
@@ -826,11 +828,11 @@ MemoryController::initStats(AggregateStat* parentStat)
 	_numTBDirtyHit.init("TBDirtyHit", "Tag buffer hits (LLC dirty evict)"); memStats->append(&_numTBDirtyHit);
 	_numTBDirtyMiss.init("TBDirtyMiss", "Tag buffer misses (LLC dirty evict)"); memStats->append(&_numTBDirtyMiss);
 
-	_numTouchedLines.init("totalTouchLines", "total # of touched lines in UnisonCache"); memStats->append(&_numTouchedLines);
-	_numEvictedLines.init("totalEvictLines", "total # of evicted lines in UnisonCache"); memStats->append(&_numEvictedLines);
+	_numTouchedLines.init("totalTouchLines", "total # of touched lines in Unison/Tagless/Hybrid Cache"); memStats->append(&_numTouchedLines);
+	_numEvictedLines.init("totalEvictLines", "total # of evicted lines in Unison/Tagless/Hybrid Cache"); memStats->append(&_numEvictedLines);
+	_numEvictedValidPages.init("totalEvictValidPages", "total # of evicted Pages have valid data in UnisonCache"); memStats->append(&_numEvictedValidPages);
 
 	_numTouchedPages.init("totalTouchedPages", "Number of pages touched"); memStats->append(&_numTouchedPages);
-	_numNotTouchedLines.init("totalNotTouchLines", "total # of never touched lines in HybridCache"); memStats->append(&_numNotTouchedLines);
 
 	_ext_dram->initStats(memStats);
 	for (uint32_t i = 0; i < _mcdram_per_mc; i++)

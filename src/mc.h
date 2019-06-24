@@ -205,6 +205,7 @@ private:
 	// For UnisonCache
 	Counter _numTouchedLines;
 	Counter _numEvictedLines;
+    Counter _numEvictedValidPages;
 
     // For HybridCache
 	Counter _numNotTouchedLines;

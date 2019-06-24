@@ -564,11 +564,7 @@ VOID Instruction(INS ins) {
         }
 
         // Instrument only conditional branches
-        // For kernel version larger than 4.0, there will be some assertion failed
-        // see https://github.com/s5z/zsim/issues/154
-        // workaround is add INS_IsXend(ins)
-        //if (INS_Category(ins) == XED_CATEGORY_COND_BR) {
-        if (INS_Category(ins) == XED_CATEGORY_COND_BR && !INS_IsXend(ins)) {
+        if (INS_Category(ins) == XED_CATEGORY_COND_BR) {
             INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR) IndirectRecordBranch, IARG_FAST_ANALYSIS_CALL, IARG_THREAD_ID,
                     IARG_INST_PTR, IARG_BRANCH_TAKEN, IARG_BRANCH_TARGET_ADDR, IARG_FALLTHROUGH_ADDR, IARG_END);
         }
@@ -665,14 +661,16 @@ static uintptr_t vsyscallStart;
 static uintptr_t vsyscallEnd;
 static bool vsyscallWarned = false;
 
-void VdsoInsertFunc(IMG vi, const char* fName, VdsoFunc func) {
-    ADDRINT baseAddr = IMG_LowAddress(vi);
-    RTN rtn = RTN_FindByName(vi, fName);
-    if (rtn == RTN_Invalid()) {
+// Helper function from parse_vsdo.cpp
+extern void vdso_init_from_sysinfo_ehdr(uintptr_t base);
+extern void *vdso_sym(const char *version, const char *name);
+
+void VdsoInsertFunc(const char* fName, VdsoFunc func) {
+    ADDRINT vdsoFuncAddr = (ADDRINT) vdso_sym("LINUX_2.6", fName);
+    if (vdsoFuncAddr == 0) {
         warn("Did not find %s in vDSO", fName);
     } else {
-        ADDRINT rtnAddr = RTN_Address(rtn) - baseAddr + vdsoStart;
-        vdsoEntryMap[rtnAddr] = func;
+        vdsoEntryMap[vdsoFuncAddr] = func;
     }
 }
 
@@ -687,33 +685,21 @@ void VdsoInit() {
         return;
     }
 
-    // Write it out
-    std::stringstream file_ss;
-    file_ss << zinfo->outputDir << "/vdso.dso." << procIdx;
-    const char* file = file_ss.str().c_str();
-    FILE* vf = fopen(file, "w");
-    fwrite(reinterpret_cast<void*>(vdso.start), 1, vdsoEnd-vdsoStart, vf);
-    fclose(vf);
+    vdso_init_from_sysinfo_ehdr(vdsoStart);
 
-    // Load it and analyze it
-    IMG vi = IMG_Open(file);
-    if (!IMG_Valid(vi)) panic("Loaded vDSO not valid");
+    VdsoInsertFunc("clock_gettime", VF_CLOCK_GETTIME);
+    VdsoInsertFunc("__vdso_clock_gettime", VF_CLOCK_GETTIME);
 
-    VdsoInsertFunc(vi, "clock_gettime", VF_CLOCK_GETTIME);
-    VdsoInsertFunc(vi, "__vdso_clock_gettime", VF_CLOCK_GETTIME);
+    VdsoInsertFunc("gettimeofday", VF_GETTIMEOFDAY);
+    VdsoInsertFunc("__vdso_gettimeofday", VF_GETTIMEOFDAY);
 
-    VdsoInsertFunc(vi, "gettimeofday", VF_GETTIMEOFDAY);
-    VdsoInsertFunc(vi, "__vdso_gettimeofday", VF_GETTIMEOFDAY);
+    VdsoInsertFunc("time", VF_TIME);
+    VdsoInsertFunc("__vdso_time", VF_TIME);
 
-    VdsoInsertFunc(vi, "time", VF_TIME);
-    VdsoInsertFunc(vi, "__vdso_time", VF_TIME);
+    VdsoInsertFunc("getcpu", VF_GETCPU);
+    VdsoInsertFunc("__vdso_getcpu", VF_GETCPU);
 
-    VdsoInsertFunc(vi, "getcpu", VF_GETCPU);
-    VdsoInsertFunc(vi, "__vdso_getcpu", VF_GETCPU);
-
-    //info("vDSO info initialized");
-    IMG_Close(vi);
-    remove(file);
+    info("vDSO info initialized");
 
     Section vsyscall = FindSection("vsyscall");
     vsyscallStart = vsyscall.start;
@@ -829,7 +815,7 @@ uint32_t CountActiveThreads() {
 }
 
 void SimThreadStart(THREADID tid) {
-    //info("Thread %d starting", tid);
+    info("Thread %d starting", tid);
     if (tid > MAX_THREADS) panic("tid > MAX_THREADS");
     zinfo->sched->start(procIdx, tid, procTreeNode->getMask());
     activeThreads[tid] = true;
@@ -1335,7 +1321,7 @@ class SyncEvent: public Event {
 
 VOID FFThread(VOID* arg) {
     futex_lock(&zinfo->ffToggleLocks[procIdx]); //initialize
-    //info("FF control Thread TID %ld", syscall(SYS_gettid));
+    info("FF control Thread TID %ld", syscall(SYS_gettid));
 
     while (true) {
         //block ourselves until someone wakes us up with an unlock
@@ -1462,7 +1448,7 @@ int main(int argc, char *argv[]) {
         panic("prctl() failed");
     }
 
-    info("Started instance, myID is %d", getpid());
+    info("Started instance");
 
     //Decrease priority to avoid starving system processes (e.g. gluster)
     //setpriority(PRIO_PROCESS, getpid(), 10);
@@ -1523,7 +1509,7 @@ int main(int argc, char *argv[]) {
         cids[i] = UNINITIALIZED_CID;
     }
 
-    //info("Started process, PID %d", getpid()); //NOTE: external scripts expect this line, please do not change without checking first
+    info("Started process, PID %d", getpid()); //NOTE: external scripts expect this line, please do not change without checking first
 
     //Unless things change substantially, keep this disabled; it causes higher imbalance and doesn't solve large system time with lots of processes.
     //Affinity testing code
@@ -1533,7 +1519,7 @@ int main(int argc, char *argv[]) {
     int result = sched_setaffinity(getpid(), sizeof(cpu_set_t), &cpuset);
     info("Affinity result %d", result);*/
 
-    //info("procMask: 0x%lx", procMask);
+    info("procMask: 0x%lx", procMask);
 
     if (zinfo->sched) zinfo->sched->processCleanup(procIdx);
 
@@ -1578,9 +1564,7 @@ int main(int argc, char *argv[]) {
         SimEnd();
     } else {
         // Never returns
-        //info(" flag \n");
         PIN_StartProgram();
-        //info(" flag \n");
     }
     return 0;
 }
