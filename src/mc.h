@@ -204,6 +204,13 @@ private:
 	Counter _numTBDirtyMiss;
 	// For UnisonCache
 	Counter _numTouchedLines;
+	Counter _numTouchedLines8Blocks;
+	Counter _numTouchedLines16Blocks;
+	Counter _numTouchedLines24Blocks;
+	Counter _numTouchedLines32Blocks;
+	Counter _numTouchedLines48Blocks;
+	Counter _numTouchedLines64Blocks;
+	Counter _numTouchedLinesFullBlocks;
 	Counter _numEvictedLines;
     Counter _numEvictedValidPages;
 

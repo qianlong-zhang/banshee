@@ -483,6 +483,34 @@ MemoryController::access(MemReq& req)
 					assert(unison_dirty_lines <= 64);
 					_numTouchedLines.inc(unison_touch_lines);
 					_numEvictedLines.inc(unison_dirty_lines);
+                    if(unison_dirty_lines < 8)
+                    {
+                        _numTouchedLines8Blocks.inc();
+                    }
+                    else if(unison_dirty_lines < 16)
+                    {
+                        _numTouchedLines16Blocks.inc();
+                    }
+                    else if(unison_dirty_lines < 24)
+                    {
+                        _numTouchedLines24Blocks.inc();
+                    }
+                    else if(unison_dirty_lines < 32)
+                    {
+                        _numTouchedLines32Blocks.inc();
+                    }
+                    else if(unison_dirty_lines < 48)
+                    {
+                        _numTouchedLines48Blocks.inc();
+                    }
+                    else if(unison_dirty_lines < 64)
+                    {
+                        _numTouchedLines64Blocks.inc();
+                    }
+                    else if(unison_dirty_lines == 64)
+                    {
+                        _numTouchedLinesFullBlocks.inc();
+                    }
 				}
 
 				if (_cache[set_num].ways[replace_way].dirty) {
@@ -829,6 +857,13 @@ MemoryController::initStats(AggregateStat* parentStat)
 	_numTBDirtyMiss.init("TBDirtyMiss", "Tag buffer misses (LLC dirty evict)"); memStats->append(&_numTBDirtyMiss);
 
 	_numTouchedLines.init("totalTouchLines", "total # of touched lines in Unison/Tagless/Hybrid Cache"); memStats->append(&_numTouchedLines);
+	_numTouchedLines8Blocks.init("totalTouchLines8Blocks", "total # of touched lines in Unison/Tagless/Hybrid Cache less than 8 blocks"); memStats->append(&_numTouchedLines8Blocks);
+	_numTouchedLines16Blocks.init("totalTouchLines16Blocks", "page count of total num of touched lines in Unison/Tagless/Hybrid Cache between 8 and 16 blocks"); memStats->append(&_numTouchedLines16Blocks);
+	_numTouchedLines24Blocks.init("totalTouchLines24Blocks", "page count of total num of touched lines in Unison/Tagless/Hybrid Cache between 16 and 24 blocks"); memStats->append(&_numTouchedLines24Blocks);
+	_numTouchedLines32Blocks.init("totalTouchLines32Blocks", "page count of total num of touched lines in Unison/Tagless/Hybrid Cache between 24 and 32 blocks"); memStats->append(&_numTouchedLines32Blocks);
+	_numTouchedLines48Blocks.init("totalTouchLines48Blocks", "page count of total num of touched lines in Unison/Tagless/Hybrid Cache between 32 and 48 blocks"); memStats->append(&_numTouchedLines48Blocks);
+	_numTouchedLines64Blocks.init("totalTouchLines64Blocks", "page count of total num of touched lines in Unison/Tagless/Hybrid Cache between 48 and 64 blocks"); memStats->append(&_numTouchedLines64Blocks);
+	_numTouchedLinesFullBlocks.init("totalTouchLinesFullBlocks", "page count of total number of touched lines in Unison/Tagless/Hybrid Cache are 64 blocks"); memStats->append(&_numTouchedLinesFullBlocks);
 	_numEvictedLines.init("totalEvictLines", "total # of evicted lines in Unison/Tagless/Hybrid Cache"); memStats->append(&_numEvictedLines);
 	_numEvictedValidPages.init("totalEvictValidPages", "total # of evicted Pages have valid data in UnisonCache"); memStats->append(&_numEvictedValidPages);
 
