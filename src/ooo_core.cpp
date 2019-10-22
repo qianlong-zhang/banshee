@@ -135,6 +135,7 @@ InstrFuncPtrs OOOCore::GetFuncPtrs() {return {LoadFunc, StoreFunc, BblFunc, Bran
 
 inline void OOOCore::load(Address addr) {
     loadAddrs[loads++] = addr;
+    //info("In func:%s, line:%d, addr is:0x%lx\n", __func__, __LINE__, addr);
 }
 
 void OOOCore::store(Address addr) {

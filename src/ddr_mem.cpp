@@ -177,8 +177,8 @@ DDRMemory::DDRMemory(uint32_t _lineSize, uint32_t _colSize, uint32_t _ranksPerCh
     rdQueue.init(queueDepth);
     wrQueue.init(queueDepth);
 
-    info("%s: domain %d, %d ranks/ch %d banks/rank, tech %s, boundLat %d rd / %d wr",
-            name.c_str(), domain, ranksPerChannel, banksPerRank, tech, minRdLatency, minWrLatency);
+    //info("%s: domain %d, %d ranks/ch %d banks/rank, tech %s, boundLat %d rd / %d wr",
+    //        name.c_str(), domain, ranksPerChannel, banksPerRank, tech, minRdLatency, minWrLatency);
 
     minRespCycle = tCL + tBL + 1; // We subtract tCL + tBL from this on some checks; this avoids overflows
 
@@ -216,9 +216,9 @@ DDRMemory::DDRMemory(uint32_t _lineSize, uint32_t _colSize, uint32_t _ranksPerCh
     }
     rowShift = startBit;  // row has no mask
 
-    info("%s: Address mapping %s row %d:%ld col %d:%d rank %d:%d bank %d:%d",
-            name.c_str(), addrMapping, 63, rowShift, ilog2(colMask << colShift), colShift,
-            ilog2(rankMask << rankShift), rankShift, ilog2(bankMask << bankShift), bankShift);
+    //info("%s: Address mapping %s row %d:%ld col %d:%d rank %d:%d bank %d:%d",
+    //        name.c_str(), addrMapping, 63, rowShift, ilog2(colMask << colShift), colShift,
+    //        ilog2(rankMask << rankShift), rankShift, ilog2(bankMask << bankShift), bankShift);
 
     // Weave phase events
     new RefreshEvent(this, memToSysCycle(tREFI), domain);
@@ -239,7 +239,7 @@ void DDRMemory::initStats(AggregateStat* parentStat) {
     profTotalWrLat.init("wrlat", "Total latency experienced by write requests"); memStats->append(&profTotalWrLat);
     profReadHits.init("rdhits", "Read row hits"); memStats->append(&profReadHits);
     profWriteHits.init("wrhits", "Write row hits"); memStats->append(&profWriteHits);
-    latencyHist.init("mlh", "latency histogram for memory requests", NUMBINS); 
+    latencyHist.init("mlh", "latency histogram for memory requests", NUMBINS);
 	// XXX //memStats->append(&latencyHist);
     parentStat->append(memStats);
 }
@@ -271,10 +271,10 @@ uint64_t DDRMemory::access(MemReq& req, int type, uint32_t data_size) {
         if (zinfo->eventRecorders[req.srcId]) {
 			// accessing multiple lines is modeled as multiple requests.
 			// All the requests can be processed in parallel.
-			//  
+			//
             DDRMemoryAccEvent* memEv = new (zinfo->eventRecorders[req.srcId]) DDRMemoryAccEvent(this,
                     isWrite, req.lineAddr, data_size, domain, preDelay, isWrite? postDelayWr : postDelayRd);
-			if (type == 0) // default. The only record. 
+			if (type == 0) // default. The only record.
             {
             	memEv->setMinStartCycle(req.cycle);
 				TimingRecord tr = {req.lineAddr, req.cycle, respCycle, req.type, memEv, memEv};
@@ -285,12 +285,12 @@ uint64_t DDRMemory::access(MemReq& req, int type, uint32_t data_size) {
             	memEv->setMinStartCycle(tr.reqCycle);
 				assert(tr.endEvent);
 				tr.endEvent->addChild(memEv, zinfo->eventRecorders[req.srcId]);
-				// XXX when to update respCycle 
+				// XXX when to update respCycle
 				//tr.respCycle = respCycle;
 				tr.type = req.type;
 				tr.endEvent = memEv;
            	 	zinfo->eventRecorders[req.srcId]->pushRecord(tr);
-			} else if (type == 2) { 
+			} else if (type == 2) {
 				// append the current event to the end of the previous one
 				// but the current event is not on the critical path
            	 	TimingRecord tr = zinfo->eventRecorders[req.srcId]->popRecord();
@@ -615,7 +615,7 @@ uint64_t DDRMemory::trySchedule(uint64_t curCycle, uint64_t sysCycle) {
 
     // Figure out data bus constraints, find actual time at which command is issued
     uint64_t cmdCycle = std::max(minCmdCycle, minRespCycle - tCL);
-	// To support accessing granularity greater than a cacheline. 
+	// To support accessing granularity greater than a cacheline.
     //minRespCycle = cmdCycle + tCL + tBL;
     //minRespCycle = cmdCycle + tCL + tBL * r->data_size;
     minRespCycle = cmdCycle + tCL + r->data_size;
@@ -653,7 +653,7 @@ uint64_t DDRMemory::trySchedule(uint64_t curCycle, uint64_t sysCycle) {
 	    //    bytesReads.inc(64 * r->data_size);
 		//else if (tBL == 1)
 	    //    bytesReads.inc(32 * r->data_size);
-		//else 
+		//else
 		//	assert(false);
         bytesReads.inc(16 * r->data_size);
         profTotalRdLat.inc(scDelay);
@@ -668,7 +668,7 @@ uint64_t DDRMemory::trySchedule(uint64_t curCycle, uint64_t sysCycle) {
         //	bytesWrites.inc(64 * r->data_size);
 		//else if (tBL == 1)
         //	bytesWrites.inc(32 * r->data_size);
-		//else 
+		//else
 		//	assert(false);
 
         profTotalWrLat.inc(scDelay);

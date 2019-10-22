@@ -255,7 +255,7 @@ void LaunchProcess(uint32_t procIdx) {
         info("Calling arguments:");
         for (unsigned int i = 0; i < args.size(); i++) {
             trace(Harness, " arg%d = %s", i, args[i].c_str());
-            info(" arg%d = %s", i, args[i].c_str());
+            //info(" arg%d = %s", i, args[i].c_str());
             aptrs[i] = args[i].c_str();
         }
         aptrs[nargs-1] = nullptr;
@@ -342,7 +342,7 @@ int main(int argc, char *argv[]) {
     signal(SIGTERM, sigHandler);
 
     signal(SIGCHLD, chldSigHandler);
-    //info("chldSigHandler done");
+    info("chldSigHandler done");
 
     //SIGUSR1 is used by children processes when they want to get a debugger session started;
     struct sigaction debugSa;
@@ -401,13 +401,13 @@ int main(int argc, char *argv[]) {
     pinCmd = new PinCmd(&conf, configFile, outputDir, shmid);
     uint32_t numProcs = pinCmd->getNumCmdProcs();
 
-    //info("numProcs is %d", numProcs);
+    info("numProcs is %d", numProcs);
     for (uint32_t procIdx = 0; procIdx < numProcs; procIdx++) {
         //info("dealing Procs %d", procIdx);
         LaunchProcess(procIdx);
     }
 
-    //info("after LaunchProcess pid is %d", getpid());
+    info("after LaunchProcess pid is %d", getpid());
     if (numProcs == 0) panic("No process config found. Config file needs at least a process0 entry");
 
     //Wait for all processes to finish

@@ -405,10 +405,10 @@ CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal)
     CacheGroup* cgp = new CacheGroup;
     CacheGroup& cg = *cgp;
 	bool is_llc = false;
-	info("Creating %s", name.c_str());
+	//info("Creating %s", name.c_str());
 	if(name.compare("l3") == 0 )
 	{
-		info("Creating LLC!!");
+		//info("Creating LLC!!");
 		 is_llc = true;
 	}
 
@@ -495,7 +495,7 @@ static void InitSystem(Config& config) {
         //uint32_t domain = nextDomain(); //i*zinfo->numDomains/memControllers;
         uint32_t domain = i*zinfo->numDomains/memControllers;
         mems[i] = BuildMemoryController(config, zinfo->lineSize, zinfo->freqMHz, domain, name);
-		info("mems[%d] is :%p, tlb is %p", i, mems[i], dynamic_cast<MemoryController *>(mems[i])->getTLB());
+		//info("mems[%d] is :%p, tlb is %p", i, mems[i], dynamic_cast<MemoryController *>(mems[i])->getTLB());
     }
 
     if (memControllers > 1) {
@@ -611,7 +611,7 @@ static void InitSystem(Config& config) {
                   "Use multiple groups for non-homogeneous children per parent!", grp, parents, children);
         }
 
-		info("children = %d, parents=%d\n", children, parents);
+		//info("children = %d, parents=%d\n", children, parents);
         for (uint32_t p = 0; p < parents; p++) {
             g_vector<MemObject*> parentsVec;
             parentsVec.insert(parentsVec.end(), parentCaches[p].begin(), parentCaches[p].end()); //BaseCache* to MemObject* is a safe cast
@@ -636,7 +636,7 @@ static void InitSystem(Config& config) {
                     parentName += "..";
                     parentName += parentCaches[p][parentCaches[p].size()-1]->getName();
                 }
-                info("Hierarchy: %s -> %s", Str(cacheNames).c_str(), parentName.c_str());
+                //info("Hierarchy: %s -> %s", Str(cacheNames).c_str(), parentName.c_str());
             }
 
             for (BaseCache* bank : parentCaches[p]) {

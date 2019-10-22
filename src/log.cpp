@@ -30,7 +30,7 @@
 
 const char* logHeader = "";
 
-const char* logTypeNames[] = {"Harness", "Config", "Process", "Cache", "Mem", "Sched", "FSVirt", "TimeVirt"};
+const char* logTypeNames[] = {"Harness", "Config", "Process", "Cache", "Mem", "Sched", "FSVirt", "TimeVirt", "LongCache"};
 
 FILE* logFdOut = stdout;
 FILE* logFdErr = stderr;

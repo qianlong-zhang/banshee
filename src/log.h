@@ -58,6 +58,7 @@ typedef enum {
     LOG_Sched,
     LOG_FSVirt,
     LOG_TimeVirt,
+    LOG_MC,
 } LogType;
 
 // defined in log.cpp
@@ -143,9 +144,16 @@ class PrintExpr {
 { \
     log_lock(); \
     fprintf(logFdOut, "%s", logHeader); \
-    fprintf(logFdOut, "In file  %s line %d: ", __FILE__, __LINE__); \
+    fprintf(logFdOut, "In func: %s line %d: ", __func__, __LINE__); \
     fprintf(logFdOut, args); \
     fprintf(logFdOut, "\n"); \
+    fflush(logFdOut); \
+    log_unlock(); \
+}
+#define print(args...) \
+{ \
+    log_lock(); \
+    fprintf(logFdOut, args); \
     fflush(logFdOut); \
     log_unlock(); \
 }
@@ -154,16 +162,32 @@ class PrintExpr {
  * that happens to conflict with this...
  */
 /* FIXME: Better conditional tracing (e.g., via mask) */
-//#define _LOG_TRACE_
+#define _LOG_TRACE_
 #ifdef _LOG_TRACE_
+#if 0
 #define trace(type, args...) \
 { \
-    if (( LOG_##type == LOG_Cache)) { \
+    if (( LOG_##type == LOG_MC)) { \
         log_lock(); \
         fprintf(logFdErr, "%sLOG(%s): ", logHeader, logTypeNames[(int) LOG_##type]); \
+        fprintf(logFdErr, "%s", logHeader); \
+        fprintf(logFdErr, "In func: %s line %d: ", __func__, __LINE__); \
         fprintf(logFdErr, args); \
         fprintf(logFdErr, "\n"); \
         fflush(logFdErr); \
+        log_unlock(); \
+    } \
+}
+#endif
+#define trace(type, args...) \
+{ \
+    if (( LOG_##type == LOG_MC)) { \
+        log_lock(); \
+        fprintf(logFdOut, "%sLOG(%s): ", logHeader, logTypeNames[(int) LOG_##type]); \
+        fprintf(logFdOut, "In func: %s line %d: ", __func__, __LINE__); \
+        fprintf(logFdOut, args); \
+        fprintf(logFdOut, "\n"); \
+        fflush(logFdOut); \
         log_unlock(); \
     } \
 }
