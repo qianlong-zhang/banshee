@@ -389,22 +389,18 @@ uint32_t PagePlacementPolicy::handleCacheHit(Address tag, Address full_addr, Req
 
 /*
  * insert primeTag's victim into subTag,
- * return subTag's victim way
- *  replaced_primeTag_way: valid   replaced_subTag_way: valid      candidate_way
- *  replaced_primeTag_way: valid   replaced_subTag_way: invalid    candidate_way
- *  replaced_primeTag_way: invalid   replaced_subTag_way: valid    candidate_way
- *  replaced_primeTag_way: invalid   replaced_subTag_way: invalid  candidate_way
+ * return subTag's empty/victim way
+ *  candidate->primeTag; primeTag->subTag; subTag->ext_dram
+ *  replaced_primeTag_way: valid   replaced_subTag_way: valid
+ *  replaced_primeTag_way: valid   replaced_subTag_way: invalid
  * TODO: this function is not correct. the flow primeTag->subTag->candidate is not finished
  * !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
  */
 uint32_t PagePlacementPolicy::handlePrimeTagEvict(uint32_t replaced_primeTag_way, Address tag, ReqType type, uint64_t set_num, Set * set, bool &counter_access)
 {
 	uint64_t chunk_num = set_num;
-	//ChunkInfo * chunk = &_chunks[chunk_num];
 	_chunks[chunk_num].num_misses ++;
     trace(MC, "dealing with tag: 0x%lx", tag);
-    if(_in_way_replace)
-        return replaced_primeTag_way;
 
 	if (_placement_policy == LRU)
 	{
@@ -465,7 +461,7 @@ uint32_t PagePlacementPolicy::handlePrimeTagEvict(uint32_t replaced_primeTag_way
 	}
 	for (uint32_t way = _mc->getNumWays(); way< _num_entries_per_chunk; way++)
 	{
-		//currently we only use subTag in candidate ways
+		//currently we only use primeTag in candidate ways
 		assert(chunk->entries[way].subTagValid == false);
     }
 #endif
@@ -476,89 +472,37 @@ uint32_t PagePlacementPolicy::handlePrimeTagEvict(uint32_t replaced_primeTag_way
 		return _mc->getNumWays();
 	}
 
-	double sample_rate = _sample_rate;
-	bool miss_rate_tune = true; //false;
-	if (sample_rate == 1)
-		miss_rate_tune = false;
-	if (_mc->getNumRequests() < _mc->getNumSets() * _mc->getNumWays() * 64 * 8)
-		sample_rate = 1;
+    uint32_t empty_way = set->subTagGetEmptyWay();
+    trace(MC, "subTag empty_way =%d", empty_way);
+    counter_access = true;
+    _num_counter_read ++;
+    _num_counter_write ++;
 
-	// the set uses FBR replacement policy
-	bool updateFBR = set->subTagHasEmptyWay() ||  sampleOrNot(sample_rate, miss_rate_tune);
-	if (updateFBR)
-	{
-		uint32_t empty_way = set->subTagGetEmptyWay();
-        trace(MC, "subTag empty_way =%d", empty_way);
-		counter_access = true;
-		_num_counter_read ++;
-		_num_counter_write ++;
-		uint32_t idx = getChunkEntry(tag, &_chunks[chunk_num], false);
-        trace(MC, "subTag idx = %d", idx);
-		if (idx == _num_entries_per_chunk)
-			return _mc->getNumWays();
-		ChunkEntry * chunk_entry = &_chunks[chunk_num].entries[idx];
-		chunk_entry->subCount ++;
-		if (chunk_entry->subCount >= _max_count_size)
-			handleCounterOverflow(&_chunks[chunk_num], chunk_entry, false);
-
-		//idx = adjustEntryOrder(&_chunks[chunk_num], idx);
-		//chunk_entry = &_chunks[chunk_num].entries[idx];
-
-		// empty slots left in dram cache
-		if (empty_way < _mc->getNumWays()) {
-			assert(idx == empty_way);
-            trace(MC, "idx:%d == empty_way:%d", idx, empty_way);
-			_num_emptySubTag_replace ++;
-			return empty_way;
-		}
-		else // figure if we can replace an entry.
-		{
-			assert(idx >= _mc->getNumWays());
-			uint32_t victim_way = pickVictimSubTagWay(&_chunks[chunk_num]);
-			assert(victim_way < _mc->getNumWays());
-/*			if (compareCounter(&_chunks[chunk_num].entries[idx], &_chunks[chunk_num].entries[victim_way]) && !_mc->getTagBuffer()->canInsert(tag, _chunks[chunk_num].entries[victim_way].tag))
-			{
-				printf("!!!!!!Occupancy = %f\n", _mc->getTagBuffer()->getOccupancy());
-				static int n = 0;
-				printf("cannot insert (%d)   occupancy=%f.  set1=%ld, set2=%ld\n",
-						n++, _mc->getTagBuffer()->getOccupancy(), (tag % 128), _chunks[chunk_num].entries[victim_way].tag % 128);
-			}
-*/
-			if (compareCandidatePrimeCounter(&_chunks[chunk_num].entries[idx], &_chunks[chunk_num].entries[victim_way])
-				&& _mc->getTagBuffer()->canInsert(tag, _chunks[chunk_num].entries[victim_way].primeTag))
-			{
-				//assert(idx < _num_stable_entries);
-				// swap current way with victim way.
-				ChunkEntry tmp = _chunks[chunk_num].entries[idx];
-				_chunks[chunk_num].entries[idx] = _chunks[chunk_num].entries[victim_way];
-				_chunks[chunk_num].entries[victim_way] = tmp;
-				//assert(idx >= _mc->getNumWays() && idx < _num_stable_entries);
-				return victim_way;
-			}
-			else {
-				return _mc->getNumWays();
-			}
-		}
-	}
-    return _mc->getNumWays();
+    // empty slots left in dram cache subTag, insert evicted primeTag
+    if (empty_way < _mc->getNumWays()) {
+        _chunks[chunk_num].entries[empty_way].subTag = tag;
+        _chunks[chunk_num].entries[empty_way].subTagValid = true;
+        _chunks[chunk_num].entries[empty_way].subCount = 0;
+        _num_emptySubTag_replace ++;
+        return empty_way;
+    }
+    else // find victim subTag
+    {
+        uint32_t victim_way = pickVictimSubTagWay(&_chunks[chunk_num]);
+        assert(victim_way < _mc->getNumWays());
+        // insert the primeTag directly, write back evicted subTag  to ext_dram
+        _chunks[chunk_num].entries[victim_way] = _chunks[chunk_num].entries[replaced_primeTag_way];
+        return victim_way;
+    }
+    // can not return _mc_getNumWays() because evicted primeTag must find a subTag to insert
 }
-#if 0
-uint32_t PagePlacementPolicy::handleSubTagHit(uint32_t replaced_primeTag_way, Address tag, Address full_addr, ReqType type, uint64_t set_num, Set * set, bool &counter_access)
-{
-	if(_in_way_replace)
-	{
-		return replaced_primeTag_way;
-	}
-}
-#endif
+
 
 /*
  * 1. if called by handleCacheHit( maybe hit primeTag/subTag ) in primeTag/subTag,
  *    return the hit way num,so we should pass isPrimeTag to this function
  * 2. if called by handleCacheMiss(), return invalid primeTag or candidate primeTag way num,
  *    called with isPrimeTag set
- * 3. if called by handlePrimeTagEvict(),
- *    pickVictimSubTagWay() will return subTag victim, here only return invalid subTag
  */
 uint32_t PagePlacementPolicy::getChunkEntry(Address tag, ChunkInfo * chunk_info, bool allocate, bool isPrimeTag)
 {
@@ -570,7 +514,7 @@ uint32_t PagePlacementPolicy::getChunkEntry(Address tag, ChunkInfo * chunk_info,
 		{
 			if (chunk_info->entries[i].primeTagValid && chunk_info->entries[i].primeTag == tag)
 				return i; //&chunk_info->entries[i];
-			// if miss, find the first invalid way in primeTag and candidate, and replace it
+			// if miss, find the first invalid way in primeTag, and replace it
 			else if (!chunk_info->entries[i].primeTagValid && idx == _num_entries_per_chunk)
 				idx = i;
 		}
@@ -579,6 +523,7 @@ uint32_t PagePlacementPolicy::getChunkEntry(Address tag, ChunkInfo * chunk_info,
 	// allocation should happen in primeTag.
 	else
 	{
+        //assert(cache hit in subTag);
 		// if hit, return the subTag hit way num
 		for (uint32_t i = 0; i < _num_entries_per_chunk; i++)
 		{

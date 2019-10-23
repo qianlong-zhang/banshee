@@ -158,35 +158,35 @@ uint64_t
 MemoryController::access(MemReq& req)
 {
 	switch (req.type) {
-        case PUTS:
-        case PUTX:
-            *req.state = I;
-            break;
-        case GETS:
-            *req.state = req.is(MemReq::NOEXCL)? S : E;
-            break;
-        case GETX:
-            *req.state = M;
-            break;
-        default: panic("!?");
-    }
+		case PUTS:
+		case PUTX:
+			*req.state = I;
+			break;
+		case GETS:
+			*req.state = req.is(MemReq::NOEXCL)? S : E;
+			break;
+		case GETX:
+			*req.state = M;
+			break;
+		default: panic("!?");
+	}
 	if (req.type == PUTS)
 		return req.cycle;
 	futex_lock(&_lock);
 	// ignore clean LLC eviction
-    if (_collect_trace && _name == "mem-0") {
-        _address_trace[_cur_trace_len] = req.lineAddr;
-        _type_trace[_cur_trace_len] = (req.type == PUTX)? 1 : 0;
-        _cur_trace_len ++;
-        assert(_cur_trace_len <= _max_trace_len);
-        if (_cur_trace_len == _max_trace_len) {
-            FILE * f = fopen((_trace_dir + g_string("/") + _name + g_string("trace.bin")).c_str(), "ab");
-            fwrite(_address_trace, sizeof(Address), _max_trace_len, f);
-            fwrite(_type_trace, sizeof(uint32_t), _max_trace_len, f);
-            fclose(f);
-            _cur_trace_len = 0;
-        }
-    }
+	if (_collect_trace && _name == "mem-0") {
+		_address_trace[_cur_trace_len] = req.lineAddr;
+		_type_trace[_cur_trace_len] = (req.type == PUTX)? 1 : 0;
+		_cur_trace_len ++;
+		assert(_cur_trace_len <= _max_trace_len);
+		if (_cur_trace_len == _max_trace_len) {
+			FILE * f = fopen((_trace_dir + g_string("/") + _name + g_string("trace.bin")).c_str(), "ab");
+			fwrite(_address_trace, sizeof(Address), _max_trace_len, f);
+			fwrite(_type_trace, sizeof(uint32_t), _max_trace_len, f);
+			fclose(f);
+			_cur_trace_len = 0;
+		}
+	}
 
 	_num_requests ++;
 	info("_num_requests = %ld", _num_requests);
@@ -208,7 +208,7 @@ MemoryController::access(MemReq& req)
 	uint32_t hit_way = _num_ways;
 	//uint64_t orig_cycle = req.cycle;
 	uint64_t data_ready_cycle = req.cycle;
-    MESIState state;
+	MESIState state;
 
 	uint64_t step_length = _cache_size / 64 / 10;
 	// whether needs to probe tag for LongCache.
@@ -219,7 +219,7 @@ MemoryController::access(MemReq& req)
 
 	if (_tlb.find(tag) == _tlb.end()){
 		trace(MC, "can not find tlb entry for 0x%lx, creating one", tag);
-     	_tlb[tag] = TLBEntry {tag, _num_ways, 0};
+		_tlb[tag] = TLBEntry {tag, _num_ways, 0};
 #if 0
 		trace(MC,  "Printing TLB: ");
 		for(auto iter=_tlb.begin(); iter!=_tlb.end(); iter++)
@@ -231,8 +231,8 @@ MemoryController::access(MemReq& req)
 			print("\n");
 		}
 #endif
-        _numTouchedPages.inc();
-    }
+		_numTouchedPages.inc();
+	}
 	if ( _sram_tag)
 	{
 		trace(MC, "With SRAM Tag");
@@ -240,17 +240,17 @@ MemoryController::access(MemReq& req)
 	}
 
 #if 0
-    trace(MC,  "Printing Tag Buffer: \n");
-    _tag_buffer->printAll();
+	trace(MC,  "Printing Tag Buffer: \n");
+	_tag_buffer->printAll();
 
-    trace(MC,  "Printing TLB: \n");
-    for(auto iter=_tlb.begin(); iter!=_tlb.end(); iter++)
-    {
-        if(iter->first != 0 && iter->second.way!=_num_ways)
-        {
-            trace(MC,  "Address:0x%lx, tag:0x%lx, way:%ld, footprint_history:0x%lx\n", iter->first, iter->second.tag, iter->second.way, iter->second.footprint_history);
-        }
-    }
+	trace(MC,  "Printing TLB: \n");
+	for(auto iter=_tlb.begin(); iter!=_tlb.end(); iter++)
+	{
+		if(iter->first != 0 && iter->second.way!=_num_ways)
+		{
+			trace(MC,  "Address:0x%lx, tag:0x%lx, way:%ld, footprint_history:0x%lx\n", iter->first, iter->second.tag, iter->second.way, iter->second.footprint_history);
+		}
+	}
 #endif
 
 	// TagBuffer miss
@@ -282,7 +282,7 @@ MemoryController::access(MemReq& req)
 		assert((_cache[set_num].ways[hit_way].subTagValidBits & _cache[set_num].ways[hit_way].primeTagValidBits) == 0);
 		//TLB hit does not means footprint data must in Dram Cache, only means Tag is in Dram Cache
 		assert(_cache[set_num].ways[hit_way].isRealHit(tag, address) ||
-			_cache[set_num].ways[hit_way].onlyTagHit(tag, address));
+				_cache[set_num].ways[hit_way].onlyTagHit(tag, address));
 
 		/********** dealing with tag access *********/
 		if (!hybrid_tag_probe) {
@@ -317,7 +317,7 @@ MemoryController::access(MemReq& req)
 		// TB miss, DC subTag Hit(maybe), valid=0 or valid=1;
 		// where the request hit(primeTag or subTag) is determined by dram cache itself
 		// subTag hit may invoke cache replacement and subTag promote
-        bool counter_access = false;
+		bool counter_access = false;
 		uint32_t primeTag_victim_way = _page_placement_policy->handleCacheHit(tag, address, type, set_num, &_cache[set_num], counter_access, hit_way);
 		if(primeTag_victim_way == _num_ways)
 		{
@@ -331,7 +331,7 @@ MemoryController::access(MemReq& req)
 		//print tlb
 		if(_tlb.find(tag) != _tlb.end())
 		{
-		    trace(MC, "In DramCache, DramCache hit, access address is 0x%lx, tag is 0x%lx", req.lineAddr, tag);
+			trace(MC, "In DramCache, DramCache hit, access address is 0x%lx, tag is 0x%lx", req.lineAddr, tag);
 		}
 #endif
 
@@ -651,7 +651,7 @@ MemoryController::access(MemReq& req)
 	// DC miss
 	else
 	{
-        trace(MC, "Dram Cache Miss: 0x%lx", tag);
+		trace(MC, "Dram Cache Miss: 0x%lx", tag);
 		// for LongCache, this assertion takes too much time
 		for (uint32_t i = 0; i < _num_ways; i ++)
 			assert(_cache[set_num].ways[i].primeTag != tag && _cache[set_num].ways[i].subTag != tag);
@@ -686,10 +686,10 @@ MemoryController::access(MemReq& req)
 				data_ready_cycle = req.cycle;
 			}
 
-            trace(MC, "set_num:%ld, _ds_index:%ld", set_num, _ds_index);
-            bool counter_access = false;
+			trace(MC, "set_num:%ld, _ds_index:%ld", set_num, _ds_index);
+			bool counter_access = false;
 			primeTag_replace_way = _page_placement_policy->handleCacheMiss(tag, address, type, set_num, &_cache[set_num], counter_access);
-            trace(MC, "cache set: %ld, primeTag_replace_way:%d", set_num, primeTag_replace_way);
+			trace(MC, "cache set: %ld, primeTag_replace_way:%d", set_num, primeTag_replace_way);
 
 
 			if(primeTag_replace_way == _num_ways)
@@ -992,195 +992,198 @@ MemoryController::access(MemReq& req)
 						}
 					}
 				}
+#if 0
+				// TODO: finish this
 				else
 				{
 				}
+#endif
 			}
-	}
+		}
 
-	// dram cache logic. Here, I'm assuming the 4 mcdram channels are
-	// organized centrally
-	bool counter_access = false;
-	// use the following state for requests, so that req.state is not changed
+		// dram cache logic. Here, I'm assuming the 4 mcdram channels are
+		// organized centrally
+		bool counter_access = false;
+		// use the following state for requests, so that req.state is not changed
 
-	// TODO. make this part work again.
-	if (counter_access && !_sram_tag) {
-		// TODO may not need the counter load if we can store freq info inside TAD
-		/////// model counter access in mcdram
-		// One counter read and one coutner write
-		assert(set_num >= _ds_index);
-		_numCounterAccess.inc();
-        MemReq counter_req = {mc_address, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
-		_mcdram[mcdram_select]->access(counter_req, 2, 2);
-		counter_req.type = PUTX;
-		_mcdram[mcdram_select]->access(counter_req, 2, 2);
-		_mc_bw_per_step += 4;
-		//////////////////////////////////////
-	}
-	if (_tag_buffer->getOccupancy() > 0.7) {
-		printf("[Tag Buffer FLUSH] occupancy = %f\n", _tag_buffer->getOccupancy());
-		_tag_buffer->clearTagBuffer();
-		_tag_buffer->setClearTime(req.cycle);
-		_numTagBufferFlush.inc();
-	}
+		// TODO. make this part work again.
+		if (counter_access && !_sram_tag) {
+			// TODO may not need the counter load if we can store freq info inside TAD
+			/////// model counter access in mcdram
+			// One counter read and one coutner write
+			assert(set_num >= _ds_index);
+			_numCounterAccess.inc();
+			MemReq counter_req = {mc_address, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
+			_mcdram[mcdram_select]->access(counter_req, 2, 2);
+			counter_req.type = PUTX;
+			_mcdram[mcdram_select]->access(counter_req, 2, 2);
+			_mc_bw_per_step += 4;
+			//////////////////////////////////////
+		}
+		if (_tag_buffer->getOccupancy() > 0.7) {
+			printf("[Tag Buffer FLUSH] occupancy = %f\n", _tag_buffer->getOccupancy());
+			_tag_buffer->clearTagBuffer();
+			_tag_buffer->setClearTime(req.cycle);
+			_numTagBufferFlush.inc();
+		}
 
-	if (_num_requests % step_length == 0)
-	{
-		_num_hit_per_step /= 2;
-		_num_miss_per_step /= 2;
-		_mc_bw_per_step /= 2;
-		_ext_bw_per_step /= 2;
-		if (_bw_balance && _mc_bw_per_step + _ext_bw_per_step > 0) {
-			// adjust _ds_index	based on mc vs. ext dram bandwidth.
-			double ratio = 1.0 * _mc_bw_per_step / (_mc_bw_per_step + _ext_bw_per_step);
-			double target_ratio = 0.8;  // because mc_bw = 4 * ext_bw
+		if (_num_requests % step_length == 0)
+		{
+			_num_hit_per_step /= 2;
+			_num_miss_per_step /= 2;
+			_mc_bw_per_step /= 2;
+			_ext_bw_per_step /= 2;
+			if (_bw_balance && _mc_bw_per_step + _ext_bw_per_step > 0) {
+				// adjust _ds_index	based on mc vs. ext dram bandwidth.
+				double ratio = 1.0 * _mc_bw_per_step / (_mc_bw_per_step + _ext_bw_per_step);
+				double target_ratio = 0.8;  // because mc_bw = 4 * ext_bw
 
-			// the larger the gap between ratios, the more _ds_index changes.
-			// _ds_index changes in the granualrity of 1/1000 dram cache capacity.
-			// 1% in the ratio difference leads to 1/1000 _ds_index change.
-			// 300 is arbitrarily chosen.
-			// XXX XXX XXX
-			// 1000 is only used for graph500 and pagerank.
-			//uint64_t index_step = _num_sets / 300; // in terms of the number of sets
-			uint64_t index_step = _num_sets / 1000; // in terms of the number of sets
-			int64_t delta_index = (ratio - target_ratio > -0.02 && ratio - target_ratio < 0.02)?
+				// the larger the gap between ratios, the more _ds_index changes.
+				// _ds_index changes in the granualrity of 1/1000 dram cache capacity.
+				// 1% in the ratio difference leads to 1/1000 _ds_index change.
+				// 300 is arbitrarily chosen.
+				// XXX XXX XXX
+				// 1000 is only used for graph500 and pagerank.
+				//uint64_t index_step = _num_sets / 300; // in terms of the number of sets
+				uint64_t index_step = _num_sets / 1000; // in terms of the number of sets
+				int64_t delta_index = (ratio - target_ratio > -0.02 && ratio - target_ratio < 0.02)?
 					0 : index_step * (ratio - target_ratio) / 0.01;
-			printf("ratio = %f\n", ratio);
-			if (delta_index > 0) {
-				// _ds_index will increase. All dirty data between _ds_index and _ds_index + delta_index
-				// should be written back to external dram.
-				// For Alloy cache, this is relatively easy.
-				// For Hybrid, we need to update tag buffer as well...
-				for (uint32_t mc = 0; mc < _mcdram_per_mc; mc ++) {
-					for (uint64_t set = _ds_index; set < (uint64_t)(_ds_index + delta_index); set ++) {
-						if (set >= _num_sets) break;
-						for (uint32_t way = 0; way < _num_ways; way ++)	 {
-							Way &meta = _cache[set].ways[way];
-							if (meta.primeTagValidBits & meta.primeTagDirtyBits)
-                            {
-                                uint64_t primeTag_dirty_bits = meta.primeTagValidBits & meta.primeTagDirtyBits;
-								// should write back to external dram.
-						        MemReq load_req = { meta.primeTag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
-								_mcdram[mc]->access(load_req, 2, __builtin_popcountll(primeTag_dirty_bits)*4);
-						        MemReq wb_req = {meta.primeTag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
-								_ext_dram->access(wb_req, 2, __builtin_popcountll(primeTag_dirty_bits)*4);
-								_ext_bw_per_step += __builtin_popcountll(primeTag_dirty_bits)*4;
-								_mc_bw_per_step += __builtin_popcountll(primeTag_dirty_bits)*4;
-                            }
-                            if(meta.subTagValidBits & meta.subTagDirtyBits)
-                            {
-                                uint64_t subTag_dirty_bits = meta.subTagValidBits & meta.subTagDirtyBits;
-								// should write back to external dram.
-						        MemReq subTag_load_req = { meta.subTag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
-								_mcdram[mc]->access(subTag_load_req, 2, __builtin_popcountll(subTag_dirty_bits)*4);
-						        MemReq subTag_wb_req = {meta.subTag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
-								_ext_dram->access(subTag_wb_req, 2, __builtin_popcountll(subTag_dirty_bits)*4);
-								_ext_bw_per_step += __builtin_popcountll(subTag_dirty_bits)*4;
-								_mc_bw_per_step += __builtin_popcountll(subTag_dirty_bits)*4;
-							}
-							if ( meta.primeTagValidBits )
-                            {
-				           		_tlb[meta.primeTag].way = _num_ways;
-								// for Hybrid cache, should insert to tag buffer as well.
-								if (!_tag_buffer->canInsert(meta.primeTag, address))
-                                {
-									printf("Rebalance. [Tag Buffer FLUSH] primeTag occupancy = %f\n", _tag_buffer->getOccupancy());
-									_tag_buffer->clearTagBuffer();
-									_tag_buffer->setClearTime(req.cycle);
-									_numTagBufferFlush.inc();
+				printf("ratio = %f\n", ratio);
+				if (delta_index > 0) {
+					// _ds_index will increase. All dirty data between _ds_index and _ds_index + delta_index
+					// should be written back to external dram.
+					// For Alloy cache, this is relatively easy.
+					// For Hybrid, we need to update tag buffer as well...
+					for (uint32_t mc = 0; mc < _mcdram_per_mc; mc ++) {
+						for (uint64_t set = _ds_index; set < (uint64_t)(_ds_index + delta_index); set ++) {
+							if (set >= _num_sets) break;
+							for (uint32_t way = 0; way < _num_ways; way ++)	 {
+								Way &meta = _cache[set].ways[way];
+								if (meta.primeTagValidBits & meta.primeTagDirtyBits)
+								{
+									uint64_t primeTag_dirty_bits = meta.primeTagValidBits & meta.primeTagDirtyBits;
+									// should write back to external dram.
+									MemReq load_req = { meta.primeTag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
+									_mcdram[mc]->access(load_req, 2, __builtin_popcountll(primeTag_dirty_bits)*4);
+									MemReq wb_req = {meta.primeTag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
+									_ext_dram->access(wb_req, 2, __builtin_popcountll(primeTag_dirty_bits)*4);
+									_ext_bw_per_step += __builtin_popcountll(primeTag_dirty_bits)*4;
+									_mc_bw_per_step += __builtin_popcountll(primeTag_dirty_bits)*4;
 								}
-								assert(_tag_buffer->canInsert(meta.primeTag, address));
-								_tag_buffer->insert(meta.primeTag, true);
-							}
-							meta.primeTagValidBits = 0;
-							meta.primeTagDirtyBits = 0;
+								if(meta.subTagValidBits & meta.subTagDirtyBits)
+								{
+									uint64_t subTag_dirty_bits = meta.subTagValidBits & meta.subTagDirtyBits;
+									// should write back to external dram.
+									MemReq subTag_load_req = { meta.subTag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
+									_mcdram[mc]->access(subTag_load_req, 2, __builtin_popcountll(subTag_dirty_bits)*4);
+									MemReq subTag_wb_req = {meta.subTag * 64, GETS, req.childId, &state, req.cycle, req.childLock, req.initialState, req.srcId, req.flags};
+									_ext_dram->access(subTag_wb_req, 2, __builtin_popcountll(subTag_dirty_bits)*4);
+									_ext_bw_per_step += __builtin_popcountll(subTag_dirty_bits)*4;
+									_mc_bw_per_step += __builtin_popcountll(subTag_dirty_bits)*4;
+								}
+								if ( meta.primeTagValidBits )
+								{
+									_tlb[meta.primeTag].way = _num_ways;
+									// for Hybrid cache, should insert to tag buffer as well.
+									if (!_tag_buffer->canInsert(meta.primeTag, address))
+									{
+										printf("Rebalance. [Tag Buffer FLUSH] primeTag occupancy = %f\n", _tag_buffer->getOccupancy());
+										_tag_buffer->clearTagBuffer();
+										_tag_buffer->setClearTime(req.cycle);
+										_numTagBufferFlush.inc();
+									}
+									assert(_tag_buffer->canInsert(meta.primeTag, address));
+									_tag_buffer->insert(meta.primeTag, true);
+								}
+								meta.primeTagValidBits = 0;
+								meta.primeTagDirtyBits = 0;
 
-							if ( meta.subTagValidBits )
-                            {
-				           		_tlb[meta.subTag].way = _num_ways;
-								// for Hybrid cache, should insert to tag buffer as well.
-								if (!_tag_buffer->canInsert(meta.subTag, address))
-                                {
-									printf("Rebalance. [Tag Buffer FLUSH] subTag occupancy = %f\n", _tag_buffer->getOccupancy());
-									_tag_buffer->clearTagBuffer();
-									_tag_buffer->setClearTime(req.cycle);
-									_numTagBufferFlush.inc();
+								if ( meta.subTagValidBits )
+								{
+									_tlb[meta.subTag].way = _num_ways;
+									// for Hybrid cache, should insert to tag buffer as well.
+									if (!_tag_buffer->canInsert(meta.subTag, address))
+									{
+										printf("Rebalance. [Tag Buffer FLUSH] subTag occupancy = %f\n", _tag_buffer->getOccupancy());
+										_tag_buffer->clearTagBuffer();
+										_tag_buffer->setClearTime(req.cycle);
+										_numTagBufferFlush.inc();
+									}
+									assert(_tag_buffer->canInsert(meta.subTag, address));
+									_tag_buffer->insert(meta.subTag, true);
 								}
-								assert(_tag_buffer->canInsert(meta.subTag, address));
-								_tag_buffer->insert(meta.subTag, true);
+								meta.subTagValidBits = 0;
+								meta.subTagDirtyBits = 0;
 							}
-							meta.subTagValidBits = 0;
-							meta.subTagDirtyBits = 0;
+							_page_placement_policy->flushChunk(set);
 						}
-						_page_placement_policy->flushChunk(set);
 					}
 				}
+				_ds_index = ((int64_t)_ds_index + delta_index <= 0)? 0 : _ds_index + delta_index;
+				printf("_ds_index = %ld/%ld\n", _ds_index, _num_sets);
 			}
-			_ds_index = ((int64_t)_ds_index + delta_index <= 0)? 0 : _ds_index + delta_index;
-			printf("_ds_index = %ld/%ld\n", _ds_index, _num_sets);
 		}
-	}
 
 #if 0
-    trace(MC, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-    trace(MC,  "Printing Tag Buffer: ");
-    _tag_buffer->printAll();
-    trace(MC, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-    trace(MC,  "Printing TLB: ");
-    for(auto iter=_tlb.begin(); iter!=_tlb.end(); iter++)
-    {
-        if(iter->first != 0 && iter->second.way!=_num_ways && iter->second.way!=0)
-        {
-            print( "\tAddress:0x%lx, tag:0x%lx, way:%ld, footprint_history:0x%lx", iter->first, iter->second.tag, iter->second.way, iter->second.footprint_history);
-			print("\n");
-        }
-    }
-    trace(MC, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-	for(uint32_t j=0; j<_num_ways; j++)
-	{
-		uint64_t i = set_num;
-		if(_cache[i].ways[j].primeTag || _cache[i].ways[j].subTag)
+		trace(MC, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+			trace(MC,  "Printing Tag Buffer: ");
+		_tag_buffer->printAll();
+		trace(MC, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+			trace(MC,  "Printing TLB: ");
+		for(auto iter=_tlb.begin(); iter!=_tlb.end(); iter++)
 		{
-			trace(MC, "Printing Dram Cache: set:%ld, way:%d", i, j);
-			print("\tprimeTag:0x%lx\t", _cache[i].ways[j].primeTag);
-			print("\tprimeTagValidBits:0x%lx\t", _cache[i].ways[j].primeTagValidBits);
-			print("\tprimeTagReferenceBits:0x%lx\t", _cache[i].ways[j].primeTagReferenceBits);
-			print("\tprimeTagDirtyBits:0x%lx\t", _cache[i].ways[j].primeTagDirtyBits);
-			print("\n");
-			print("\tsubTag:0x%lx\t", _cache[i].ways[j].subTag);
-			print("\tsubTagValidBits:0x%lx\t", _cache[i].ways[j].subTagValidBits);
-			print("\tsubTagReferenceBits:0x%lx\t", _cache[i].ways[j].subTagReferenceBits);
-			print("\tsubTagDirtyBits:0x%lx\t", _cache[i].ways[j].subTagDirtyBits);
-			print("\n");
-		}
-	}
-#endif
-
-#if 0
-	// print ALL dram cache which valid, time consuming!!
-	for(uint64_t i=0; i<_num_sets ; i++)
-	{
-		for(uint32_t j=0; j<_num_ways; j++)
-		{
-			if(_cache[i].ways[j].primeTag || _cache[i].ways[j].subTag)
+			if(iter->first != 0 && iter->second.way!=_num_ways && iter->second.way!=0)
 			{
-				trace(MC, "Printing Dram Cache: set:%ld, way:%d", i, j);
-				print("\tprimeTag:0x%lx\t", _cache[i].ways[j].primeTag);
-				print("\tprimeTagValidBits:0x%lx\t", _cache[i].ways[j].primeTagValidBits);
-				print("\tprimeTagReferenceBits:0x%lx\t", _cache[i].ways[j].primeTagReferenceBits);
-				print("\tprimeTagDirtyBits:0x%lx\t", _cache[i].ways[j].primeTagDirtyBits);
-				print("\n");
-				print("\tsubTag:0x%lx\t", _cache[i].ways[j].subTag);
-				print("\tsubTagValidBits:0x%lx\t", _cache[i].ways[j].subTagValidBits);
-				print("\tsubTagReferenceBits:0x%lx\t", _cache[i].ways[j].subTagReferenceBits);
-				print("\tsubTagDirtyBits:0x%lx\t", _cache[i].ways[j].subTagDirtyBits);
+				print( "\tAddress:0x%lx, tag:0x%lx, way:%ld, footprint_history:0x%lx", iter->first, iter->second.tag, iter->second.way, iter->second.footprint_history);
 				print("\n");
 			}
 		}
-	}
+		trace(MC, "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+			for(uint32_t j=0; j<_num_ways; j++)
+			{
+				uint64_t i = set_num;
+				if(_cache[i].ways[j].primeTag || _cache[i].ways[j].subTag)
+				{
+					trace(MC, "Printing Dram Cache: set:%ld, way:%d", i, j);
+					print("\tprimeTag:0x%lx\t", _cache[i].ways[j].primeTag);
+					print("\tprimeTagValidBits:0x%lx\t", _cache[i].ways[j].primeTagValidBits);
+					print("\tprimeTagReferenceBits:0x%lx\t", _cache[i].ways[j].primeTagReferenceBits);
+					print("\tprimeTagDirtyBits:0x%lx\t", _cache[i].ways[j].primeTagDirtyBits);
+					print("\n");
+					print("\tsubTag:0x%lx\t", _cache[i].ways[j].subTag);
+					print("\tsubTagValidBits:0x%lx\t", _cache[i].ways[j].subTagValidBits);
+					print("\tsubTagReferenceBits:0x%lx\t", _cache[i].ways[j].subTagReferenceBits);
+					print("\tsubTagDirtyBits:0x%lx\t", _cache[i].ways[j].subTagDirtyBits);
+					print("\n");
+				}
+			}
 #endif
 
- 	futex_unlock(&_lock);
+#if 0
+		// print ALL dram cache which valid, time consuming!!
+		for(uint64_t i=0; i<_num_sets ; i++)
+		{
+			for(uint32_t j=0; j<_num_ways; j++)
+			{
+				if(_cache[i].ways[j].primeTag || _cache[i].ways[j].subTag)
+				{
+					trace(MC, "Printing Dram Cache: set:%ld, way:%d", i, j);
+					print("\tprimeTag:0x%lx\t", _cache[i].ways[j].primeTag);
+					print("\tprimeTagValidBits:0x%lx\t", _cache[i].ways[j].primeTagValidBits);
+					print("\tprimeTagReferenceBits:0x%lx\t", _cache[i].ways[j].primeTagReferenceBits);
+					print("\tprimeTagDirtyBits:0x%lx\t", _cache[i].ways[j].primeTagDirtyBits);
+					print("\n");
+					print("\tsubTag:0x%lx\t", _cache[i].ways[j].subTag);
+					print("\tsubTagValidBits:0x%lx\t", _cache[i].ways[j].subTagValidBits);
+					print("\tsubTagReferenceBits:0x%lx\t", _cache[i].ways[j].subTagReferenceBits);
+					print("\tsubTagDirtyBits:0x%lx\t", _cache[i].ways[j].subTagDirtyBits);
+					print("\n");
+				}
+			}
+		}
+#endif
+	}
+	futex_unlock(&_lock);
 	//uint64_t latency = req.cycle - orig_cycle;
 	//req.cycle = orig_cycle;
 	return data_ready_cycle; //req.cycle + latency;
